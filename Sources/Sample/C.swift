@@ -17,9 +17,7 @@ class C: CustomStringConvertible {
 }
 
 extension KvEnvironmentValues {
-    private struct CKey : KvEnvironmentKey {
-        static var defaultValue: C { fatalError("No value in the environment") }
-    }
+    private struct CKey : KvEnvironmentKey { typealias Value = C }
 
     var c: C {
         get { self[CKey.self] }
