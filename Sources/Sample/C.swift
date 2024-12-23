@@ -6,9 +6,15 @@ class C: CustomStringConvertible {
     @KvEnvironment(\.a) private var a
     @KvEnvironment(\.b) private var b
 
-    init() { }
+    private let c: Double
 
-    var description: String { "C(a: \(a.map { "\($0.a)" } ?? "–"), b: \"\(b.b)\")" }
+    init(c: Double) {
+        self.c = c
+    }
+
+    var description: String {
+        "C(a: \(a.map { "\($0.a)" } ?? "–"), b: \"\(b.b)\"\(String(repeating: " ", count: max(0, 7 - b.b.count))), c: \(c))"
+    }
 
     /// Replace scope of `b` property only.
     func replace(bScope: KvEnvironmentScope) {
@@ -16,6 +22,7 @@ class C: CustomStringConvertible {
     }
 }
 
+/// Example of a key having no default value.
 extension KvEnvironmentValues {
     private struct CKey : KvEnvironmentKey { typealias Value = C }
 
