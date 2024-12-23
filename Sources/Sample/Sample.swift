@@ -3,37 +3,31 @@ import kvEnvironment
 @main
 struct Sample {
     static func main() {
-        KvEnvironmentScope.global = .init(.init())
+        KvEnvironmentScope.global.values.c = C()
 
-        let childScope1 = KvEnvironmentScope(
-            .init {
-                $0.a = .init(a: 1)
-            },
-            parent: .global
-        )
-        let childScope2 = KvEnvironmentScope(
-            .init {
-                $0.b = .init(b: "2-nd")
-            },
-            parent: .global
-        )
+        let childScopeA = KvEnvironmentScope(parent: .global) {
+            $0.a = A(a: 1)
+        }
+        let childScopeB = KvEnvironmentScope(parent: .global) {
+            $0.b = B(b: "2-nd")
+        }
 
         // Default scope
-        print(C().description)
+        print(D().description)
 
         // Custom child scope
-        let c = C(scope: childScope1)
-        print(c.description)
+        let d = D(scope: childScopeA)
+        print(d.description)
 
         // Replacing scope
-        childScope2.install(to: c)
-        print(c.description)
+        childScopeB.install(to: d)
+        print(d.description)
 
         // Replacing particular property
-        c.replace(bScope: .init {
-            $0.a = .init(a: 255)
-            $0.b = .init(b: "custom")
+        d.replace(bScope: .init {
+            $0.a = A(a: 255)
+            $0.b = B(b: "custom")
         })
-        print(c.description)
+        print(d.description)
     }
 }

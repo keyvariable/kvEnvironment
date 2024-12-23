@@ -1,18 +1,28 @@
+import Foundation
+
 import kvEnvironment
 
 class C: CustomStringConvertible {
     @KvEnvironment(\.a) private var a
     @KvEnvironment(\.b) private var b
 
-    init() {}
+    init() { }
 
-    init(scope: KvEnvironmentScope) {
-        scope.install(to: self)
-    }
+    var description: String { "C(a: \(a.map { "\($0.a)" } ?? "–"), b: \"\(b.b)\")" }
 
-    var description: String { "a.a = \(a.map { "\($0.a)" } ?? "nil"), b.b = \"\(b.b)\"" }
-
+    /// Replace scope of `b` property only.
     func replace(bScope: KvEnvironmentScope) {
         _b.scope = bScope
+    }
+}
+
+extension KvEnvironmentValues {
+    private struct CKey : KvEnvironmentKey {
+        static var defaultValue: C { fatalError("No value in the environment") }
+    }
+
+    var c: C {
+        get { self[CKey.self] }
+        set { self[CKey.self] = newValue }
     }
 }
