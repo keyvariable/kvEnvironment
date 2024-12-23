@@ -14,7 +14,7 @@ So it's assumed that *kvEnvironment* can be compiled on any platform Swift is av
 #### Package Dependencies:
 
 ```swift
-.package(url: "https://github.com/keyvariable/kvEnvironment.git", from: "0.0.1")
+.package(url: "https://github.com/keyvariable/kvEnvironment.git", from: "0.0.2")
 ```
 #### Target Dependencies:
 ```swift
