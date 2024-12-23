@@ -24,7 +24,7 @@
 //
 
 public class KvEnvironmentScope {
-    public static var global: KvEnvironmentScope?
+    public static var global = KvEnvironmentScope()
 
     public var values: KvEnvironmentValues
 

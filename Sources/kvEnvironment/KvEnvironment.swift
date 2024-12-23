@@ -53,10 +53,5 @@ public class KvEnvironment<Value> : KvEnvironmentProtocol {
 
     // MARK: Operations
 
-    public var wrappedValue: Value {
-        guard let scope = scope ?? .global
-        else { fatalError("No installed or global scope") }
-
-        return scope.values[keyPath: _keyPath]
-    }
+    public var wrappedValue: Value { (scope ?? .global).values[keyPath: _keyPath] }
 }
