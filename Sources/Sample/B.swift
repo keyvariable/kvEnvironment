@@ -10,6 +10,7 @@ class B {
     static let `default` = B(b: "default")
 }
 
+/// Example of a key having a default value.
 extension KvEnvironmentValues {
     private struct BKey : KvEnvironmentKey {
         static var defaultValue: B { .default }

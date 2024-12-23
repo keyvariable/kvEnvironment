@@ -29,3 +29,7 @@ public protocol KvEnvironmentKey {
 
     static var defaultValue: Self.Value { get }
 }
+
+public extension KvEnvironmentKey {
+    static var defaultValue: Self.Value { fatalError("No value in the environment for `\(Self.self)` key") }
+}

@@ -3,37 +3,38 @@ import kvEnvironment
 @main
 struct Sample {
     static func main() {
-        KvEnvironmentScope.global = .init(.init())
+        // Graph: A — C — D
+        //        B /
 
-        let childScope1 = KvEnvironmentScope(
-            .init {
-                $0.a = .init(a: 1)
-            },
-            parent: .global
-        )
-        let childScope2 = KvEnvironmentScope(
-            .init {
-                $0.b = .init(b: "2-nd")
-            },
-            parent: .global
-        )
+        /// Insertion of C having to default value into global scope.
+        KvEnvironmentScope.global.values.c = C(c: 3.0)
 
-        // Default scope
-        print(C().description)
+        /// A child scope where only `a` is replaced.
+        let childScopeA = KvEnvironmentScope(parent: .global) {
+            $0.a = A(a: 1)
+        }
+        /// A child scope where only `b` is replaced.
+        let childScopeB = KvEnvironmentScope(parent: .global) {
+            $0.b = B(b: "2-nd")
+        }
 
-        // Custom child scope
-        let c = C(scope: childScope1)
-        print(c.description)
+        /// Instance of `D` where dependencies are taken from global scope.
+        print(D().description)
 
-        // Replacing scope
-        childScope2.install(to: c)
-        print(c.description)
+        /// Instance of `D` where dependencies are taken from `childScopeB`.
+        let d = D(scope: childScopeB)
+        print(d.description)
 
-        // Replacing particular property
-        c.replace(bScope: .init {
-            $0.a = .init(a: 255)
-            $0.b = .init(b: "custom")
+        /// Changing all environment references to `childScopeA`.
+        childScopeA.install(to: d)
+        print(d.description)
+
+        /// Replacing particular property.
+        d.replace(bScope: .init {
+            $0.a = A(a: 255)
+            $0.b = B(b: "custom")
         })
-        print(c.description)
+        /// Now `a` and `c` are taken from `childScopeA`, but `b` is taken from custom scope.
+        print(d.description)
     }
 }

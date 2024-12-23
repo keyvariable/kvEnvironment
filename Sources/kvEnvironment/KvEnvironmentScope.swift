@@ -24,7 +24,7 @@
 //
 
 public class KvEnvironmentScope {
-    public static var global: KvEnvironmentScope?
+    public static var global = KvEnvironmentScope()
 
     public var values: KvEnvironmentValues
 
@@ -50,6 +50,7 @@ public class KvEnvironmentScope {
 
     // MARK: Operations
 
+    // TODO: DOC
     public func install(to instance: Any) {
         KvEnvironmentScope.forEachEnvironmentProperty(of: instance) {
             $0.scope = self
@@ -57,11 +58,28 @@ public class KvEnvironmentScope {
     }
 
     private static func forEachEnvironmentProperty(of instance: Any, body: (KvEnvironmentProtocol) -> Void) {
-        Mirror(reflecting: instance).children.forEach {
-            guard let value = $0.value as? KvEnvironmentProtocol
-            else { return }
 
-            body(value)
+        func Process(_ instance: Any) {
+            // Recursively enumerating properties wrapped with `@KvEnvironment` or those values may contain wrapped properties.
+            Mirror(reflecting: instance).children.forEach {
+                let next: Any
+
+                switch $0.value {
+                case let value as KvEnvironmentProtocol:
+                    body(value)
+
+                    guard let instance = value.scope?.values[keyPath: value.keyPath] else { return }
+
+                    next = instance
+
+                default:
+                    next = $0.value
+                }
+
+                Process(next)
+            }
         }
+
+        Process(instance)
     }
 }
