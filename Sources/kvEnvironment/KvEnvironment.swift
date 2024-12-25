@@ -27,7 +27,7 @@
 
 /// This protocol is used to enumerate properties with ``KvEnvironment`` wrapper.
 protocol KvEnvironmentProtocol : AnyObject {
-    var keyPath: PartialKeyPath<KvEnvironmentValues> { get }
+    var erasedWrappedValue: Any { get }
 
     var scope: KvEnvironmentScope? { get set }
 }
@@ -38,20 +38,20 @@ protocol KvEnvironmentProtocol : AnyObject {
 public class KvEnvironment<Value> : KvEnvironmentProtocol {
     public var scope: KvEnvironmentScope?
 
-    private let _keyPath: KeyPath<KvEnvironmentValues, Value>
+    private let keyPath: KeyPath<KvEnvironmentValues, Value>
 
     // MARK: Initialization
 
-    public init(_ keyPath: KeyPath<KvEnvironmentValues, Value>, in scope : KvEnvironmentScope? = nil) {
-        _keyPath = keyPath
+    public init(_ keyPath: KeyPath<KvEnvironmentValues, Value>, in scope: KvEnvironmentScope? = nil) {
+        self.keyPath = keyPath
         self.scope = scope
     }
 
     // MARK: + KvEnvironmentProtocol
 
-    var keyPath: PartialKeyPath<KvEnvironmentValues> { _keyPath }
+    var erasedWrappedValue: Any { wrappedValue }
 
     // MARK: Operations
 
-    public var wrappedValue: Value { (scope ?? .global).values[keyPath: _keyPath] }
+    public var wrappedValue: Value { (scope ?? .global).values[keyPath: keyPath] }
 }
