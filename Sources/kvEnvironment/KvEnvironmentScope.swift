@@ -32,16 +32,24 @@ public class KvEnvironmentScope {
 
     public init(_ values: KvEnvironmentValues = .init()) {
         self.values = values
+
+        guard !values.isEmpty else { return }
+
+        var visitedIDs = Set<ObjectIdentifier>()
+
+        values.forEach {
+            installRecursive(to: $0, visitedIDs: &visitedIDs)
+        }
     }
 
     public convenience init(_ transform: (inout KvEnvironmentValues) -> Void) {
         self.init(KvEnvironmentValues(transform))
     }
 
-    public init(_ values: KvEnvironmentValues = .init(), parent: KvEnvironmentScope?) {
+    public convenience init(_ values: KvEnvironmentValues = .init(), parent: KvEnvironmentScope?) {
         var values = values
         values.parent = parent
-        self.values = values
+        self.init(values)
     }
 
     public convenience init(parent: KvEnvironmentScope?, _ transform: (inout KvEnvironmentValues) -> Void) {
@@ -51,29 +59,52 @@ public class KvEnvironmentScope {
     // MARK: Operations
 
     // TODO: DOC
-    public func install(to instance: Any) {
-        KvEnvironmentScope.forEachEnvironmentProperty(of: instance) {
-            $0.scope = self
+    public func install(to instance: Any, options: InstallOptions = []) {
+        switch options.contains(.recursive) {
+        case false:
+            Mirror(reflecting: instance).children.forEach {
+                guard let reference = $0.value as? KvEnvironmentProtocol else { return }
+
+                reference.scope = self
+            }
+
+        case true:
+            var visitedIDs = Set<ObjectIdentifier>()
+
+            installRecursive(to: instance, visitedIDs: &visitedIDs)
         }
     }
 
-    private static func forEachEnvironmentProperty(of instance: Any, body: (KvEnvironmentProtocol) -> Void) {
+    private func installRecursive(to instance: Any, visitedIDs: inout Set<ObjectIdentifier>) {
+        // Recursively enumerating properties wrapped with `@KvEnvironment`.
+        //
+        // - NOTE: For-in cycle is used to reduce depth of recursion.
+        for property in Mirror(reflecting: instance).children {
+            guard let reference = property.value as? KvEnvironmentProtocol,
+                  visitedIDs.insert(ObjectIdentifier(reference)).inserted
+            else { continue }
 
-        func Process(_ instance: Any) {
-            // Recursively enumerating properties wrapped with `@KvEnvironment`.
-            Mirror(reflecting: instance).children.forEach {
-                switch $0.value {
-                case let value as KvEnvironmentProtocol:
-                    body(value)
+            reference.scope = self
 
-                    Process(value.erasedWrappedValue)
-
-                default:
-                    break
-                }
-            }
+            installRecursive(to: reference.erasedWrappedValue, visitedIDs: &visitedIDs)
         }
+    }
 
-        Process(instance)
+    // MARK: .InstallOptions
+
+    public struct InstallOptions: OptionSet, ExpressibleByIntegerLiteral {
+        public static var recursive: InstallOptions = 0x01
+
+        // MARK: + OptionSet
+
+        public typealias RawValue = UInt8
+
+        public let rawValue: RawValue
+
+        @inlinable public init(rawValue: RawValue) { self.rawValue = rawValue }
+
+        // MARK: + ExpressibleByIntegerLiteral
+
+        @inlinable public init(integerLiteral value: IntegerLiteralType) { self.init(rawValue: numericCast(value)) }
     }
 }

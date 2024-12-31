@@ -70,4 +70,8 @@ public struct KvEnvironmentValues {
 
         return nil
     }
+
+    var isEmpty: Bool { container.isEmpty }
+
+    func forEach(_ body: (Any) -> Void) { container.values.forEach(body) }
 }
