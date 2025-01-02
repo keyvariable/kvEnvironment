@@ -1,6 +1,6 @@
 //===----------------------------------------------------------------------===//
 //
-//  Copyright (c) 2023 Svyatoslav Popov (info@keyvar.com).
+//  Copyright (c) 2024 Svyatoslav Popov (info@keyvar.com).
 //
 //  This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
 //  License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
@@ -23,77 +23,198 @@
 //  Created by Svyatoslav Popov on 23.12.2024.
 //
 
-public class KvEnvironmentScope {
-    public static var global = KvEnvironmentScope()
+// TODO: DOC
+public final class KvEnvironmentScope {
+    public static var global = KvEnvironmentScope(parent: nil)
 
-    public var values: KvEnvironmentValues
+    public static var current: KvEnvironmentScope { .taskLocal ?? .global }
+
+    public private(set) var parent: KvEnvironmentScope?
+
+    @TaskLocal
+    internal static var taskLocal: KvEnvironmentScope?
+
+    @usableFromInline
+    internal var container: [ObjectIdentifier : Any] = .init()
 
     // MARK: Initialization
 
-    public init(_ values: KvEnvironmentValues = .init()) {
-        self.values = values
+    // TODO: DOC
+    @usableFromInline
+    internal init(parent: KvEnvironmentScope? = .global) {
+        self.parent = parent
+    }
 
-        guard !values.isEmpty else { return }
+    // TODO: DOC
+    /// - SeeAlso: ``empty(parent:)``.
+    public convenience init(parent: KvEnvironmentScope? = .global, contentBlock: (borrowing KvEnvironmentScope) -> Void) {
+        self.init(parent: parent)
 
-        var visitedIDs = Set<ObjectIdentifier>()
+        self.current(in: contentBlock)
+    }
 
-        values.forEach {
-            installRecursive(to: $0, visitedIDs: &visitedIDs)
+    // TODO: DOC
+    @inlinable
+    public static func empty(parent: KvEnvironmentScope? = .global) -> KvEnvironmentScope {
+        .init(parent: parent)
+    }
+
+    // MARK: Content
+
+    var isEmpty: Bool { container.isEmpty }
+
+    func forEach(_ body: (Any) -> Void) { container.values.forEach(body) }
+
+    /// Getter returns the closest value in the hierarchy by given *key*.
+    /// ``KvEnvironmentKey/defaultValue`` is returned if there is no value for *key*.
+    @inlinable
+    public subscript<Key : KvEnvironmentKey>(key: Key.Type) -> Key.Value {
+        get { value(forKey: key) ?? key.defaultValue }
+        set { container[ObjectIdentifier(key)] = newValue }
+    }
+
+    @usableFromInline
+    internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
+        firstResult { $0.container[ObjectIdentifier(key)] }
+            .map { $0 as! Key.Value }
+    }
+
+    private func firstResult<T>(of block: (borrowing KvEnvironmentScope) -> T?) -> T? {
+        if let value = block(self) {
+            return value
         }
-    }
 
-    public convenience init(_ transform: (inout KvEnvironmentValues) -> Void) {
-        self.init(KvEnvironmentValues(transform))
-    }
+        var container = self
 
-    public convenience init(_ values: KvEnvironmentValues = .init(), parent: KvEnvironmentScope?) {
-        var values = values
-        values.parent = parent
-        self.init(values)
-    }
+        while let next = container.parent {
+            if let value = block(next) {
+                return value
+            }
 
-    public convenience init(parent: KvEnvironmentScope?, _ transform: (inout KvEnvironmentValues) -> Void) {
-        self.init(KvEnvironmentValues(transform), parent: parent)
+            container = next
+        }
+
+        return nil
     }
 
     // MARK: Operations
 
     // TODO: DOC
-    public func install(to instance: Any, options: InstallOptions = []) {
+    @inlinable
+    public func callAsFunction(body: (borrowing KvEnvironmentScope) -> Void) {
+        current(in: body)
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func callAsFunction(body: (borrowing KvEnvironmentScope) throws -> Void) rethrows {
+        try current(in: body)
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func callAsFunction(body: (borrowing KvEnvironmentScope) async -> Void) async {
+        await current(in: body)
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func callAsFunction(body: (borrowing KvEnvironmentScope) async throws -> Void) async rethrows {
+        try await current(in: body)
+    }
+
+    // TODO: DOC
+    public func current(in body: (borrowing KvEnvironmentScope) throws -> Void) rethrows {
+        try KvEnvironmentScope.$taskLocal.withValue(self) {
+            try body(self)
+        }
+    }
+
+    // TODO: DOC
+    public func current(in body: (borrowing KvEnvironmentScope) async throws -> Void) async rethrows {
+        try await KvEnvironmentScope.$taskLocal.withValue(self) {
+            try await body(self)
+        }
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func replace(in instance: Any, options: ReplaceOptions = []) {
+        switch options.contains(.recursive) {
+        case false:
+            _replace(in: instance)
+
+        case true:
+            var visitedIDs = Set<ObjectIdentifier>()
+
+            _replace(in: instance, options: options, visitedIDs: &visitedIDs)
+        }
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func replace<I>(in instances: I, options: ReplaceOptions = []) where I: Sequence {
+        var visitedIDs = Set<ObjectIdentifier>()
+
+        instances.forEach {
+            _replace(in: $0, options: options, visitedIDs: &visitedIDs)
+        }
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func replace(in first: Any, _ second: Any, _ rest: Any..., options: ReplaceOptions = []) {
+        var visitedIDs = Set<ObjectIdentifier>()
+
+        _replace(in: first, options: options, visitedIDs: &visitedIDs)
+        _replace(in: second, options: options, visitedIDs: &visitedIDs)
+
+        rest.forEach {
+            _replace(in: $0, options: options, visitedIDs: &visitedIDs)
+        }
+    }
+
+    @usableFromInline
+    internal func _replace(in instance: Any) {
+        Mirror(reflecting: instance).children.forEach {
+            guard let reference = $0.value as? KvEnvironmentProtocol else { return }
+
+            reference.scope = self
+        }
+    }
+
+    @usableFromInline
+    internal func _replace(in instance: Any, options: ReplaceOptions, visitedIDs: inout Set<ObjectIdentifier>) {
         switch options.contains(.recursive) {
         case false:
             Mirror(reflecting: instance).children.forEach {
-                guard let reference = $0.value as? KvEnvironmentProtocol else { return }
+                guard let reference = $0.value as? KvEnvironmentProtocol,
+                      visitedIDs.insert(ObjectIdentifier(reference)).inserted
+                else { return }
 
                 reference.scope = self
             }
 
         case true:
-            var visitedIDs = Set<ObjectIdentifier>()
+            // Recursively enumerating properties wrapped with `@KvEnvironment`.
+            //
+            // - NOTE: For-in cycle is used to reduce depth of recursion.
+            for property in Mirror(reflecting: instance).children {
+                guard let reference = property.value as? KvEnvironmentProtocol,
+                      visitedIDs.insert(ObjectIdentifier(reference)).inserted
+                else { continue }
 
-            installRecursive(to: instance, visitedIDs: &visitedIDs)
+                reference.scope = self
+
+                _replace(in: reference.erasedWrappedValue, options: options, visitedIDs: &visitedIDs)
+            }
         }
     }
 
-    private func installRecursive(to instance: Any, visitedIDs: inout Set<ObjectIdentifier>) {
-        // Recursively enumerating properties wrapped with `@KvEnvironment`.
-        //
-        // - NOTE: For-in cycle is used to reduce depth of recursion.
-        for property in Mirror(reflecting: instance).children {
-            guard let reference = property.value as? KvEnvironmentProtocol,
-                  visitedIDs.insert(ObjectIdentifier(reference)).inserted
-            else { continue }
+    // MARK: .ReplaceOptions
 
-            reference.scope = self
-
-            installRecursive(to: reference.erasedWrappedValue, visitedIDs: &visitedIDs)
-        }
-    }
-
-    // MARK: .InstallOptions
-
-    public struct InstallOptions: OptionSet, ExpressibleByIntegerLiteral {
-        public static var recursive: InstallOptions = 0x01
+    public struct ReplaceOptions: OptionSet, ExpressibleByIntegerLiteral {
+        public static var recursive: ReplaceOptions = 0x01
 
         // MARK: + OptionSet
 

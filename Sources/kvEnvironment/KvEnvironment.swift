@@ -38,11 +38,11 @@ protocol KvEnvironmentProtocol : AnyObject {
 public class KvEnvironment<Value> : KvEnvironmentProtocol {
     public var scope: KvEnvironmentScope?
 
-    private let keyPath: KeyPath<KvEnvironmentValues, Value>
+    private let keyPath: KeyPath<KvEnvironmentScope, Value>
 
     // MARK: Initialization
 
-    public init(_ keyPath: KeyPath<KvEnvironmentValues, Value>, in scope: KvEnvironmentScope? = nil) {
+    public init(_ keyPath: KeyPath<KvEnvironmentScope, Value>, in scope: KvEnvironmentScope? = nil) {
         self.keyPath = keyPath
         self.scope = scope
     }
@@ -53,5 +53,5 @@ public class KvEnvironment<Value> : KvEnvironmentProtocol {
 
     // MARK: Operations
 
-    public var wrappedValue: Value { (scope ?? .global).values[keyPath: keyPath] }
+    public var wrappedValue: Value { (scope ?? .current)[keyPath: keyPath] }
 }

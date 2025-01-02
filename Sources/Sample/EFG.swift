@@ -20,7 +20,7 @@ struct G: CustomStringConvertible {
 }
 
 /// Example of a key having a default value.
-extension KvEnvironmentValues {
+extension KvEnvironmentScope {
     private struct EKey : KvEnvironmentKey { typealias Value = E }
     private struct FKey : KvEnvironmentKey { typealias Value = F }
 

@@ -7,43 +7,58 @@ struct Sample {
         //        B /
         do {
             /// Insertion of `C` having no default value into global scope.
-            KvEnvironmentScope.global.values.c = C(c: 3.0)
+            KvEnvironmentScope.global {
+                $0.c = C(c: 3.0)
+            }
 
             /// A child scope where only `a` is replaced.
-            let childScopeA = KvEnvironmentScope(parent: .global) {
+            let childScopeA = KvEnvironmentScope {
                 $0.a = A(a: 1)
             }
             /// A child scope where only `b` is replaced.
-            let childScopeB = KvEnvironmentScope(parent: .global) {
+            let childScopeB = KvEnvironmentScope {
                 $0.b = B(b: "2-nd")
             }
 
-            /// Instance of `D` where dependencies are taken from global scope.
-            print(D().description)
+            do {
+                /// Instance of `D` where dependencies are taken from default scope.
+                let d = D()
 
-            /// Instance of `D` where dependencies are taken from `childScopeB`.
-            let d = D(scope: childScopeB)
-            print(d.description)
+                /// Currently default scope is `.global`.
+                print(d)
 
-            /// Changing all environment references to `childScopeA`.
-            childScopeA.install(to: d, options: .recursive)
-            print(d.description)
+                /// Changing the current scope to `childScopeB`.
+                childScopeB { _ in
+                    print(d)
+                }
+            }
+            do {
+                /// Instance of `D` where dependencies are taken from `childScopeB`.
+                let d = D(scope: childScopeB)
+                print(d.description)
 
-            /// Replacing particular property.
-            d.replace(bScope: .init {
-                $0.a = A(a: 255)
-                $0.b = B(b: "custom")
-            })
-            /// Now `a` and `c` are taken from `childScopeA`, but `b` is taken from custom scope.
-            print(d.description)
+                /// Changing all environment references to `childScopeA`.
+                childScopeA.replace(in: d, options: .recursive)
+                print(d.description)
+
+                /// Replacing scope for particular property.
+                d.replace(bScope: .init {
+                    $0.a = A(a: 255)
+                    $0.b = B(b: "custom")
+                })
+                /// Now `a` and `c` are taken from `childScopeA`, but `b` is taken from custom scope.
+                print(d.description)
+            }
         }
         // Cycles: E \
         //         |  G
         //         F /
         do {
             /// Insertion of `E` and `F` into global scope.
-            KvEnvironmentScope.global.values.e = E(id: "e1")
-            KvEnvironmentScope.global.values.f = F(id: "f1")
+            KvEnvironmentScope.global {
+                $0.e = E(id: "e1")
+                $0.f = F(id: "f1")
+            }
 
             let g = G()
 
@@ -53,7 +68,7 @@ struct Sample {
                 $0.e = E(id: "e2")
                 $0.f = F(id: "f2")
             }
-            .install(to: g, options: .recursive)
+            .replace(in: g, options: .recursive)
 
             print(g)
         }

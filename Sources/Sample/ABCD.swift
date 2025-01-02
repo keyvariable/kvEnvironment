@@ -40,7 +40,7 @@ class D: CustomStringConvertible {
     init() { }
 
     init(scope: KvEnvironmentScope) {
-        scope.install(to: self, options: .recursive)
+        scope.replace(in: self, options: .recursive)
     }
 
     var description: String { "D(c: \(c))" }
@@ -51,7 +51,7 @@ class D: CustomStringConvertible {
     }
 }
 
-extension KvEnvironmentValues {
+extension KvEnvironmentScope {
     /// Example of a key having an optional value.
     private struct AKey : KvEnvironmentKey {
         static var defaultValue: A? { nil }
