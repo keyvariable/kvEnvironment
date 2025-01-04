@@ -23,6 +23,8 @@
 //  Created by Svyatoslav Popov on 23.12.2024.
 //
 
+import kvEnvironmentMacro
+
 // TODO: DOC
 public final class KvEnvironmentScope {
     public static var global = KvEnvironmentScope(parent: nil)
@@ -50,7 +52,7 @@ public final class KvEnvironmentScope {
     public convenience init(parent: KvEnvironmentScope? = .global, contentBlock: (borrowing KvEnvironmentScope) -> Void) {
         self.init(parent: parent)
 
-        self.current(in: contentBlock)
+        self.callAsFunction(body: contentBlock)
     }
 
     // TODO: DOC
@@ -100,40 +102,16 @@ public final class KvEnvironmentScope {
     // MARK: Operations
 
     // TODO: DOC
-    @inlinable
+    @KvEnvironmentScopeOverloads
+    public func callAsFunction(body: () -> Void) {
+        KvEnvironmentScope.$taskLocal.withValue(self, operation: body)
+    }
+
+    // TODO: DOC
+    @KvEnvironmentScopeOverloads
     public func callAsFunction(body: (borrowing KvEnvironmentScope) -> Void) {
-        current(in: body)
-    }
-
-    // TODO: DOC
-    @inlinable
-    public func callAsFunction(body: (borrowing KvEnvironmentScope) throws -> Void) rethrows {
-        try current(in: body)
-    }
-
-    // TODO: DOC
-    @inlinable
-    public func callAsFunction(body: (borrowing KvEnvironmentScope) async -> Void) async {
-        await current(in: body)
-    }
-
-    // TODO: DOC
-    @inlinable
-    public func callAsFunction(body: (borrowing KvEnvironmentScope) async throws -> Void) async rethrows {
-        try await current(in: body)
-    }
-
-    // TODO: DOC
-    public func current(in body: (borrowing KvEnvironmentScope) throws -> Void) rethrows {
-        try KvEnvironmentScope.$taskLocal.withValue(self) {
-            try body(self)
-        }
-    }
-
-    // TODO: DOC
-    public func current(in body: (borrowing KvEnvironmentScope) async throws -> Void) async rethrows {
-        try await KvEnvironmentScope.$taskLocal.withValue(self) {
-            try await body(self)
+        KvEnvironmentScope.$taskLocal.withValue(self) {
+            body(self)
         }
     }
 
