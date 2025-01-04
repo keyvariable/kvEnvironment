@@ -51,7 +51,9 @@ public final class KvEnvironment<Value> : KvEnvironmentProtocol {
 
     var erasedWrappedValue: Any { wrappedValue }
 
-    // MARK: Operations
+    // MARK: + @propertyWrapper
 
     public var wrappedValue: Value { (scope ?? .current)[keyPath: keyPath] }
+
+    public var projectedValue: KvEnvironment { self }
 }

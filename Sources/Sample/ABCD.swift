@@ -30,7 +30,7 @@ class C: CustomStringConvertible {
 
     /// Replace scope of `b` property only.
     func replace(bScope: KvEnvironmentScope) {
-        _b.scope = bScope
+        $b.scope = bScope
     }
 }
 
