@@ -35,7 +35,7 @@ protocol KvEnvironmentProtocol : AnyObject {
 // MARK: - KvEnvironment
 
 @propertyWrapper
-public class KvEnvironment<Value> : KvEnvironmentProtocol {
+public final class KvEnvironment<Value> : KvEnvironmentProtocol {
     public var scope: KvEnvironmentScope?
 
     private let keyPath: KeyPath<KvEnvironmentScope, Value>

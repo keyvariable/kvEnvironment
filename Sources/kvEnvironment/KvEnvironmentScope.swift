@@ -192,7 +192,7 @@ public final class KvEnvironmentScope {
     // MARK: .ReplaceOptions
 
     public struct ReplaceOptions: OptionSet, ExpressibleByIntegerLiteral {
-        public static var recursive: ReplaceOptions = 0x01
+        public static var recursive: ReplaceOptions { 0x01 }
 
         // MARK: + OptionSet
 

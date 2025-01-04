@@ -154,14 +154,14 @@ package struct KvEnvironmentScopeOverloadsMacro: PeerMacro {
 
         init(_ message: String) { self.message = message }
 
-        var description: String { "@KvAsyncThrowsMacro: \(message)" }
+        var description: String { "@KvEnvironmentScopeOverloads: \(message)" }
     }
 
     // MARK: .EffectOptions
 
     private struct EffectOptions: OptionSet, ExpressibleByIntegerLiteral {
-        static let async: EffectOptions = 0x01
-        static let `throws`: EffectOptions = 0x02
+        static var async: EffectOptions { 0x01 }
+        static var `throws`: EffectOptions { 0x02 }
 
         // MARK: + OptionSet
 
