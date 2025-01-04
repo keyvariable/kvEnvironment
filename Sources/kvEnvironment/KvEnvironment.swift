@@ -38,10 +38,12 @@ protocol KvEnvironmentProtocol : AnyObject {
 public final class KvEnvironment<Value> : KvEnvironmentProtocol {
     public var scope: KvEnvironmentScope?
 
-    private let keyPath: KeyPath<KvEnvironmentScope, Value>
+    @usableFromInline
+    internal let keyPath: KeyPath<KvEnvironmentScope, Value>
 
     // MARK: Initialization
 
+    @inlinable
     public init(_ keyPath: KeyPath<KvEnvironmentScope, Value>, in scope: KvEnvironmentScope? = nil) {
         self.keyPath = keyPath
         self.scope = scope
@@ -53,7 +55,9 @@ public final class KvEnvironment<Value> : KvEnvironmentProtocol {
 
     // MARK: + @propertyWrapper
 
+    @inlinable
     public var wrappedValue: Value { (scope ?? .current)[keyPath: keyPath] }
 
+    @inlinable
     public var projectedValue: KvEnvironment { self }
 }

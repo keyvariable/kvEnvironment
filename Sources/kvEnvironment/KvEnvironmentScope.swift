@@ -34,7 +34,7 @@ public final class KvEnvironmentScope {
     public private(set) var parent: KvEnvironmentScope?
 
     @TaskLocal
-    internal static var taskLocal: KvEnvironmentScope?
+    static var taskLocal: KvEnvironmentScope?
 
     @usableFromInline
     internal var container: [ObjectIdentifier : Any] = .init()
@@ -192,7 +192,7 @@ public final class KvEnvironmentScope {
     // MARK: .ReplaceOptions
 
     public struct ReplaceOptions: OptionSet, ExpressibleByIntegerLiteral {
-        public static var recursive: ReplaceOptions { 0x01 }
+        @inlinable public static var recursive: ReplaceOptions { 0x01 }
 
         // MARK: + OptionSet
 
