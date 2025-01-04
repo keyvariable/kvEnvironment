@@ -23,21 +23,33 @@
 //  Created by Svyatoslav Popov on 23.12.2024.
 //
 
+import Foundation
+
 import kvEnvironmentMacro
 
 // TODO: DOC
 public final class KvEnvironmentScope {
-    public static var global = KvEnvironmentScope(parent: nil)
+    public static var global: KvEnvironmentScope {
+        get { mutationLock.withLock { _global } }
+        set { mutationLock.withLock { _global = newValue } }
+    }
 
     public static var current: KvEnvironmentScope { .taskLocal ?? .global }
-
-    public private(set) var parent: KvEnvironmentScope?
 
     @TaskLocal
     static var taskLocal: KvEnvironmentScope?
 
+    private static var _global = KvEnvironmentScope(parent: nil)
+
+    private static let mutationLock = NSLock()
+
+    public private(set) var parent: KvEnvironmentScope?
+
     @usableFromInline
     internal var container: [ObjectIdentifier : Any] = .init()
+
+    @usableFromInline
+    internal let mutationLock = NSLock()
 
     // MARK: Initialization
 
@@ -63,22 +75,33 @@ public final class KvEnvironmentScope {
 
     // MARK: Content
 
-    var isEmpty: Bool { container.isEmpty }
+    var isEmpty: Bool {
+        mutationLock.withLock {
+            container.isEmpty
+        }
+    }
 
-    func forEach(_ body: (Any) -> Void) { container.values.forEach(body) }
+    func forEach(_ body: (Any) -> Void) {
+        mutationLock.withLock { container }
+            .values.forEach(body)
+    }
 
     /// Getter returns the closest value in the hierarchy by given *key*.
     /// ``KvEnvironmentKey/defaultValue`` is returned if there is no value for *key*.
     @inlinable
     public subscript<Key : KvEnvironmentKey>(key: Key.Type) -> Key.Value {
         get { value(forKey: key) ?? key.defaultValue }
-        set { container[ObjectIdentifier(key)] = newValue }
+        set { mutationLock.withLock { container[ObjectIdentifier(key)] = newValue } }
     }
 
     @usableFromInline
     internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
-        firstResult { $0.container[ObjectIdentifier(key)] }
-            .map { $0 as! Key.Value }
+        firstResult { scope in
+            scope.mutationLock.withLock {
+                scope.container[ObjectIdentifier(key)]
+            }
+        }
+        .map { $0 as! Key.Value }
     }
 
     private func firstResult<T>(of block: (borrowing KvEnvironmentScope) -> T?) -> T? {
