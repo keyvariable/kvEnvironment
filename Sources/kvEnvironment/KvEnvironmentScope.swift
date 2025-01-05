@@ -25,8 +25,6 @@
 
 import Foundation
 
-import kvEnvironmentMacro
-
 // TODO: DOC
 public final class KvEnvironmentScope {
     public static var global: KvEnvironmentScope {
@@ -125,13 +123,13 @@ public final class KvEnvironmentScope {
     // MARK: Operations
 
     // TODO: DOC
-    @KvEnvironmentScopeOverloads
+    @KvEnvironmentScopeAsyncThrowsOverloads
     public func callAsFunction(body: () -> Void) {
         KvEnvironmentScope.$taskLocal.withValue(self, operation: body)
     }
 
     // TODO: DOC
-    @KvEnvironmentScopeOverloads
+    @KvEnvironmentScopeAsyncThrowsOverloads
     public func callAsFunction(body: (borrowing KvEnvironmentScope) -> Void) {
         KvEnvironmentScope.$taskLocal.withValue(self) {
             body(self)
@@ -230,3 +228,12 @@ public final class KvEnvironmentScope {
         @inlinable public init(integerLiteral value: IntegerLiteralType) { self.init(rawValue: numericCast(value)) }
     }
 }
+
+// MARK: - KvEnvironmentScopeOverloads
+
+/// This macro creates overloads of a function having `async`, `throws` and `async throws` effects on the method and any closure parameter.
+@attached(peer, names: overloaded)
+private macro KvEnvironmentScopeAsyncThrowsOverloads() = #externalMacro(
+    module: "kvEnvironmentMacro",
+    type: "KvEnvironmentScopeAsyncThrowsOverloadsMacro"
+)

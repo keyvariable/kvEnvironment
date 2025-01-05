@@ -29,6 +29,6 @@ import SwiftSyntaxMacros
 @main
 struct KvEnvironmentMacro: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
-        KvEnvironmentScopeOverloadsMacro.self,
+        KvEnvironmentScopeAsyncThrowsOverloadsMacro.self,
     ]
 }

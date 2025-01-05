@@ -21,13 +21,12 @@ let package = Package(
             ]
         ),
         .macro(
-            name: "kvEnvironmentMacroImpl",
+            name: "kvEnvironmentMacro",
             dependencies: [
                 .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
             ]
         ),
         .target(name: "kvEnvironment", dependencies: [ "kvEnvironmentMacro" ]),
-        .target(name: "kvEnvironmentMacro", dependencies: ["kvEnvironmentMacroImpl"]),
     ]
 )

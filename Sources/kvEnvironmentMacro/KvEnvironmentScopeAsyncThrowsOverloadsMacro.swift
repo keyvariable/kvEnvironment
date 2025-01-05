@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvEnvironmentScopeOverloadsMacro.swift
+//  KvEnvironmentScopeAsyncThrowsOverloadsMacro.swift
 //  KvEnvironment
 //
 //  Created by Svyatoslav Popov on 03.01.2025.
@@ -28,7 +28,7 @@ import Foundation
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-package struct KvEnvironmentScopeOverloadsMacro: PeerMacro {
+package struct KvEnvironmentScopeAsyncThrowsOverloadsMacro: PeerMacro {
     package static func expansion<Context: MacroExpansionContext, Declaration: DeclSyntaxProtocol>(
         of node: AttributeSyntax,
         providingPeersOf declaration: Declaration,
