@@ -154,7 +154,7 @@ package struct KvEnvironmentScopeAsyncThrowsOverloadsMacro: PeerMacro {
 
         init(_ message: String) { self.message = message }
 
-        var description: String { "@KvEnvironmentScopeOverloads: \(message)" }
+        var description: String { "@KvEnvironmentScopeAsyncThrowsOverloads: \(message)" }
     }
 
     // MARK: .EffectOptions

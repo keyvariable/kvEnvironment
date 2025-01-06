@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvEnvironmentMacro.swift
+//  KvEnvironmentMacros.swift
 //  KvEnvironment
 //
 //  Created by Svyatoslav Popov on 03.01.2025.
@@ -27,8 +27,9 @@ import SwiftCompilerPlugin
 import SwiftSyntaxMacros
 
 @main
-struct KvEnvironmentMacro: CompilerPlugin {
+struct KvEnvironmentMacros: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         KvEnvironmentScopeAsyncThrowsOverloadsMacro.self,
+        KvEnvironmentScopeEntryMacro.self,
     ]
 }

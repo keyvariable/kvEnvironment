@@ -229,11 +229,17 @@ public final class KvEnvironmentScope {
     }
 }
 
-// MARK: - KvEnvironmentScopeOverloads
+// MARK: - macro kvEnvironmentScope
+
+// TODO: DOC
+@freestanding(declaration, names: arbitrary)
+public macro kvEnvironment(properties: () -> Void) = #externalMacro(module: "kvEnvironmentMacros", type: "KvEnvironmentScopeEntryMacro")
+
+// MARK: - macro KvEnvironmentScopeOverloads
 
 /// This macro creates overloads of a function having `async`, `throws` and `async throws` effects on the method and any closure parameter.
 @attached(peer, names: overloaded)
 private macro KvEnvironmentScopeAsyncThrowsOverloads() = #externalMacro(
-    module: "kvEnvironmentMacro",
+    module: "kvEnvironmentMacros",
     type: "KvEnvironmentScopeAsyncThrowsOverloadsMacro"
 )

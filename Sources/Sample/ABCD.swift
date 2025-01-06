@@ -3,6 +3,9 @@ import kvEnvironment
 struct A {
     let a: Int
 }
+extension A: ExpressibleByIntegerLiteral {
+    init(integerLiteral value: IntegerLiteralType) { self.init(a: value) }
+}
 
 class B {
     let b: String
@@ -52,31 +55,14 @@ class D: CustomStringConvertible {
 }
 
 extension KvEnvironmentScope {
-    /// Example of a key having an optional value.
-    private struct AKey : KvEnvironmentKey {
-        static var defaultValue: A? { nil }
+    /// Implicit initial value of optional types is `nil`.
+    #kvEnvironment { var a: A? }
+    #kvEnvironment {
+        /// A property with xplicit default value.
+        var b: B = .default
+        /// A property having no default value.
+        var c: C
     }
-
-    /// Example of a key having a default value.
-    private struct BKey : KvEnvironmentKey {
-        static var defaultValue: B { .default }
-    }
-
-    /// Example of a key having no default value.
-    private struct CKey : KvEnvironmentKey { typealias Value = C }
-
-    var a: A? {
-        get { self[AKey.self] }
-        set { self[AKey.self] = newValue }
-    }
-
-    var b: B {
-        get { self[BKey.self] }
-        set { self[BKey.self] = newValue }
-    }
-
-    var c: C {
-        get { self[CKey.self] }
-        set { self[CKey.self] = newValue }
-    }
+    /// Constant declarations are transformed to computed properties having getters only.
+    #kvEnvironment { let a_ee: A = 0xEE, a_ff: A? = 0xFF }
 }

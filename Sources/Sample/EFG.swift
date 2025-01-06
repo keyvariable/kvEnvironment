@@ -21,15 +21,8 @@ struct G: CustomStringConvertible {
 
 /// Example of a key having a default value.
 extension KvEnvironmentScope {
-    private struct EKey : KvEnvironmentKey { typealias Value = E }
-    private struct FKey : KvEnvironmentKey { typealias Value = F }
-
-    var e: E {
-        get { self[EKey.self] }
-        set { self[EKey.self] = newValue }
-    }
-    var f: F {
-        get { self[FKey.self] }
-        set { self[FKey.self] = newValue }
+    #kvEnvironment {
+        var e: E
+        var f: F
     }
 }
