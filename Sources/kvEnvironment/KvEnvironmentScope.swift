@@ -1,6 +1,6 @@
 //===----------------------------------------------------------------------===//
 //
-//  Copyright (c) 2023 Svyatoslav Popov (info@keyvar.com).
+//  Copyright (c) 2024 Svyatoslav Popov (info@keyvar.com).
 //
 //  This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
 //  License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
@@ -23,63 +23,223 @@
 //  Created by Svyatoslav Popov on 23.12.2024.
 //
 
-public class KvEnvironmentScope {
-    public static var global = KvEnvironmentScope()
+import Foundation
 
-    public var values: KvEnvironmentValues
+// TODO: DOC
+public final class KvEnvironmentScope {
+    public static var global: KvEnvironmentScope {
+        get { mutationLock.withLock { _global } }
+        set { mutationLock.withLock { _global = newValue } }
+    }
+
+    public static var current: KvEnvironmentScope { .taskLocal ?? .global }
+
+    @TaskLocal
+    static var taskLocal: KvEnvironmentScope?
+
+    private static var _global = KvEnvironmentScope(parent: nil)
+
+    private static let mutationLock = NSLock()
+
+    public private(set) var parent: KvEnvironmentScope?
+
+    @usableFromInline
+    internal var container: [ObjectIdentifier : Any] = .init()
+
+    @usableFromInline
+    internal let mutationLock = NSLock()
 
     // MARK: Initialization
 
-    public init(_ values: KvEnvironmentValues = .init()) {
-        self.values = values
+    // TODO: DOC
+    @usableFromInline
+    internal init(parent: KvEnvironmentScope? = .global) {
+        self.parent = parent
     }
 
-    public convenience init(_ transform: (inout KvEnvironmentValues) -> Void) {
-        self.init(KvEnvironmentValues(transform))
+    // TODO: DOC
+    /// - SeeAlso: ``empty(parent:)``.
+    public convenience init(parent: KvEnvironmentScope? = .global, contentBlock: (borrowing KvEnvironmentScope) -> Void) {
+        self.init(parent: parent)
+
+        self.callAsFunction(body: contentBlock)
     }
 
-    public init(_ values: KvEnvironmentValues = .init(), parent: KvEnvironmentScope?) {
-        var values = values
-        values.parent = parent
-        self.values = values
+    // TODO: DOC
+    @inlinable
+    public static func empty(parent: KvEnvironmentScope? = .global) -> KvEnvironmentScope {
+        .init(parent: parent)
     }
 
-    public convenience init(parent: KvEnvironmentScope?, _ transform: (inout KvEnvironmentValues) -> Void) {
-        self.init(KvEnvironmentValues(transform), parent: parent)
+    // MARK: Content
+
+    var isEmpty: Bool {
+        mutationLock.withLock {
+            container.isEmpty
+        }
+    }
+
+    func forEach(_ body: (Any) -> Void) {
+        mutationLock.withLock { container }
+            .values.forEach(body)
+    }
+
+    /// Getter returns the closest value in the hierarchy by given *key*.
+    /// ``KvEnvironmentKey/defaultValue`` is returned if there is no value for *key*.
+    @inlinable
+    public subscript<Key : KvEnvironmentKey>(key: Key.Type) -> Key.Value {
+        get { value(forKey: key) ?? key.defaultValue }
+        set { mutationLock.withLock { container[ObjectIdentifier(key)] = newValue } }
+    }
+
+    @usableFromInline
+    internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
+        firstResult { scope in
+            scope.mutationLock.withLock {
+                scope.container[ObjectIdentifier(key)]
+            }
+        }
+        .map { $0 as! Key.Value }
+    }
+
+    private func firstResult<T>(of block: (borrowing KvEnvironmentScope) -> T?) -> T? {
+        if let value = block(self) {
+            return value
+        }
+
+        var container = self
+
+        while let next = container.parent {
+            if let value = block(next) {
+                return value
+            }
+
+            container = next
+        }
+
+        return nil
     }
 
     // MARK: Operations
 
     // TODO: DOC
-    public func install(to instance: Any) {
-        KvEnvironmentScope.forEachEnvironmentProperty(of: instance) {
-            $0.scope = self
+    @KvEnvironmentScopeAsyncThrowsOverloads
+    public func callAsFunction(body: () -> Void) {
+        KvEnvironmentScope.$taskLocal.withValue(self, operation: body)
+    }
+
+    // TODO: DOC
+    @KvEnvironmentScopeAsyncThrowsOverloads
+    public func callAsFunction(body: (borrowing KvEnvironmentScope) -> Void) {
+        KvEnvironmentScope.$taskLocal.withValue(self) {
+            body(self)
         }
     }
 
-    private static func forEachEnvironmentProperty(of instance: Any, body: (KvEnvironmentProtocol) -> Void) {
+    // TODO: DOC
+    @inlinable
+    public func replace(in instance: Any, options: ReplaceOptions = []) {
+        switch options.contains(.recursive) {
+        case false:
+            _replace(in: instance)
 
-        func Process(_ instance: Any) {
-            // Recursively enumerating properties wrapped with `@KvEnvironment` or those values may contain wrapped properties.
+        case true:
+            var visitedIDs = Set<ObjectIdentifier>()
+
+            _replace(in: instance, options: options, visitedIDs: &visitedIDs)
+        }
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func replace<I>(in instances: I, options: ReplaceOptions = []) where I: Sequence {
+        var visitedIDs = Set<ObjectIdentifier>()
+
+        instances.forEach {
+            _replace(in: $0, options: options, visitedIDs: &visitedIDs)
+        }
+    }
+
+    // TODO: DOC
+    @inlinable
+    public func replace(in first: Any, _ second: Any, _ rest: Any..., options: ReplaceOptions = []) {
+        var visitedIDs = Set<ObjectIdentifier>()
+
+        _replace(in: first, options: options, visitedIDs: &visitedIDs)
+        _replace(in: second, options: options, visitedIDs: &visitedIDs)
+
+        rest.forEach {
+            _replace(in: $0, options: options, visitedIDs: &visitedIDs)
+        }
+    }
+
+    @usableFromInline
+    internal func _replace(in instance: Any) {
+        Mirror(reflecting: instance).children.forEach {
+            guard let reference = $0.value as? KvEnvironmentProtocol else { return }
+
+            reference.scope = self
+        }
+    }
+
+    @usableFromInline
+    internal func _replace(in instance: Any, options: ReplaceOptions, visitedIDs: inout Set<ObjectIdentifier>) {
+        switch options.contains(.recursive) {
+        case false:
             Mirror(reflecting: instance).children.forEach {
-                let next: Any
+                guard let reference = $0.value as? KvEnvironmentProtocol,
+                      visitedIDs.insert(ObjectIdentifier(reference)).inserted
+                else { return }
 
-                switch $0.value {
-                case let value as KvEnvironmentProtocol:
-                    body(value)
+                reference.scope = self
+            }
 
-                    guard let instance = value.scope?.values[keyPath: value.keyPath] else { return }
+        case true:
+            // Recursively enumerating properties wrapped with `@KvEnvironment`.
+            //
+            // - NOTE: For-in cycle is used to reduce depth of recursion.
+            for property in Mirror(reflecting: instance).children {
+                guard let reference = property.value as? KvEnvironmentProtocol,
+                      visitedIDs.insert(ObjectIdentifier(reference)).inserted
+                else { continue }
 
-                    next = instance
+                reference.scope = self
 
-                default:
-                    next = $0.value
-                }
-
-                Process(next)
+                _replace(in: reference.erasedWrappedValue, options: options, visitedIDs: &visitedIDs)
             }
         }
+    }
 
-        Process(instance)
+    // MARK: .ReplaceOptions
+
+    public struct ReplaceOptions: OptionSet, ExpressibleByIntegerLiteral {
+        @inlinable public static var recursive: ReplaceOptions { 0x01 }
+
+        // MARK: + OptionSet
+
+        public typealias RawValue = UInt8
+
+        public let rawValue: RawValue
+
+        @inlinable public init(rawValue: RawValue) { self.rawValue = rawValue }
+
+        // MARK: + ExpressibleByIntegerLiteral
+
+        @inlinable public init(integerLiteral value: IntegerLiteralType) { self.init(rawValue: numericCast(value)) }
     }
 }
+
+// MARK: - macro kvEnvironmentScope
+
+// TODO: DOC
+@freestanding(declaration, names: arbitrary)
+public macro kvEnvironment(properties: () -> Void) = #externalMacro(module: "kvEnvironmentMacros", type: "KvEnvironmentScopeEntryMacro")
+
+// MARK: - macro KvEnvironmentScopeOverloads
+
+/// This macro creates overloads of a function having `async`, `throws` and `async throws` effects on the method and any closure parameter.
+@attached(peer, names: overloaded)
+private macro KvEnvironmentScopeAsyncThrowsOverloads() = #externalMacro(
+    module: "kvEnvironmentMacros",
+    type: "KvEnvironmentScopeAsyncThrowsOverloadsMacro"
+)
