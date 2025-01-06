@@ -19,7 +19,6 @@ struct G: CustomStringConvertible {
     var description: String { "G(e: \(e.id), f: \(f.id), e.f: \(e.f.id))" }
 }
 
-/// Example of a key having a default value.
 extension KvEnvironmentScope {
     #kvEnvironment {
         var e: E

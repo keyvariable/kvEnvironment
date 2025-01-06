@@ -58,7 +58,7 @@ extension KvEnvironmentScope {
     /// Implicit initial value of optional types is `nil`.
     #kvEnvironment { var a: A? }
     #kvEnvironment {
-        /// A property with xplicit default value.
+        /// A property with explicit default value.
         var b: B = .default
         /// A property having no default value.
         var c: C

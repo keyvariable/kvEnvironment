@@ -54,7 +54,7 @@ package struct KvEnvironmentScopeAsyncThrowsOverloadsMacro: PeerMacro {
         else { throw ExpansionError("a non-async function is required") }
 
         guard originDecl.signature.effectSpecifiers?.throwsSpecifier == nil
-        else { throw ExpansionError("a nonthrowing function is required") }
+        else { throw ExpansionError("a non-throwing function is required") }
 
         // Dropping the macro attribute.
         originDecl.attributes = originDecl.attributes.filter {
