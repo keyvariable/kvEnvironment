@@ -3,9 +3,6 @@ import kvEnvironment
 struct A {
     let a: Int
 }
-extension A: ExpressibleByIntegerLiteral {
-    init(integerLiteral value: IntegerLiteralType) { self.init(a: value) }
-}
 
 class B {
     let b: String
@@ -13,8 +10,6 @@ class B {
     init(b: String) {
         self.b = b
     }
-
-    static let `default` = B(b: "default")
 }
 
 class C: CustomStringConvertible {
@@ -59,10 +54,10 @@ extension KvEnvironmentScope {
     #kvEnvironment { var a: A? }
     #kvEnvironment {
         /// A property with explicit default value.
-        var b: B = .default
+        var b: B = .init(b: "default")
         /// A property having no default value.
         var c: C
     }
     /// Constant declarations are transformed to computed properties having getters only.
-    #kvEnvironment { let a_ee: A = 0xEE, a_ff: A? = 0xFF }
+    #kvEnvironment { let a_ee: A = .init(a: 0xEE), a_ff: A? = .init(a: 0xFF) }
 }

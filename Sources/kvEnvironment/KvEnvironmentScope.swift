@@ -94,14 +94,18 @@ public final class KvEnvironmentScope {
 
     @usableFromInline
     internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
-        firstResult { scope in
-            scope.mutationLock.withLock {
-                scope.container[ObjectIdentifier(key)]
-            }
-        }
-        .map { $0 as! Key.Value }
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+
+        return firstResult { scope in scope.container[ObjectIdentifier(key)] }
+            .map { $0 as! Key.Value }
+        ?? { value in
+            container[ObjectIdentifier(key)] = value
+            return value
+        }(key.defaultValue)
     }
 
+    /// - Important: `mutationLock` must be locked.
     private func firstResult<T>(of block: (borrowing KvEnvironmentScope) -> T?) -> T? {
         if let value = block(self) {
             return value
@@ -110,7 +114,7 @@ public final class KvEnvironmentScope {
         var container = self
 
         while let next = container.parent {
-            if let value = block(next) {
+            if let value = next.mutationLock.withLock({ block(next) }) {
                 return value
             }
 

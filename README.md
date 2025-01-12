@@ -5,7 +5,8 @@ An implementation of dependency injection pattern. *kvEnvironment* provides:
 - hierarchy of scopes with cascade resolution of properties;
 - thread-safety;
 - flexible ways to override scopes;
-- retain-cycles-free architecture.
+- retain-cycles-free architecture;
+- lazy initialization of properties.
 
 
 ## Supported Platforms
