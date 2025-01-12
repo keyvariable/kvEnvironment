@@ -72,7 +72,7 @@ Environment property `b` is declared as an opaque type and has a default value.
 So `C` can be instantiated in any scope at any moment due to the defaults are provided.
 
 If an environment property is defined with no default value,
-then it have to be initialized explicitly before it’s getter is invoked.
+then it have to be initialized explicitly before it\'s getter is invoked.
 
 ### Scopes
 
