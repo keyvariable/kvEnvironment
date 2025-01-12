@@ -47,20 +47,16 @@ extension KvEnvironmentScope {
 
 ### Simple Example
 
-Below is an example where `B` depends on `A`:
+Below is an example where `C` depends on `A` and `B`:
 ```swift
 struct A { let a: Int }
 
-struct B {
-    let b: String
-    
-    static let `default` = B(b: "default")
-}
+struct B { let b: String }
 
 extension KvEnvironmentScope {
     #kvEnvironment {
         var a: A?
-        var b: B = .default
+        var b: B = .init(b: "default")
     }
 }
 
@@ -73,7 +69,10 @@ struct C {
 Environment property `a` is declared as optional.
 `#kvEnvironment` macro provides implicit default value `nil` for optional types.
 Environment property `b` is declared as an opaque type and has a default value.
-So `C` can be instantiated everywhere.
+So `C` can be instantiated in any scope at any moment due to the defaults are provided.
+
+If an environment property is defined with no default value,
+then it have to be initialized explicitly before it’s getter is invoked.
 
 ### Scopes
 
