@@ -5,7 +5,7 @@ An implementation of dependency injection pattern. *kvEnvironment* provides:
 - hierarchy of scopes with cascade resolution of properties;
 - thread-safety;
 - flexible ways to override scopes;
-- support of cyclic dependencies. 
+- retain-cycles-free architecture.
 
 
 ## Supported Platforms
@@ -27,6 +27,18 @@ So it's assumed that *kvEnvironment* can be compiled on any platform Swift is av
 #### Import:
 ```swift
 import kvEnvironment
+```
+
+#### Declaration of a Scope Property:
+```swift
+extension KvEnvironmentScope {
+    #kvEnvironment { var someProperty: SomeType }
+}
+```
+
+#### Injection of a Dependency:
+```swift
+@KvEnvironment(\.someProperty) private var someProperty
 ```
 
 
