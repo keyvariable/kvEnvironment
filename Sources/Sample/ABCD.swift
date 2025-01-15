@@ -58,6 +58,20 @@ extension KvEnvironmentScope {
         /// A property having no default value.
         var c: C
     }
+}
+/// Specify access modifiers (e.g. public, private, etc.) for the extensions
+/// to manage visibility of produced environment properties.
+private extension KvEnvironmentScope {
     /// Constant declarations are transformed to computed properties having getters only.
     #kvEnvironment { let a_ee: A = .init(a: 0xEE), a_ff: A? = .init(a: 0xFF) }
+}
+/// Below is an example of explicit declaration of an environment property.
+private extension KvEnvironmentScope {
+    private struct aZeroKey : KvEnvironmentKey {
+        static var defaultValue: A { .init(a: 0) }
+    }
+    var zeroA: A {
+        get { self[aZeroKey.self] }
+        set { self[aZeroKey.self] = newValue }
+    }
 }
