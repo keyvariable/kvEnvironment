@@ -33,11 +33,6 @@ public struct KvEnvironmentScopeEntryMacro: DeclarationMacro {
     ) throws -> [DeclSyntax] {
         let closure: ClosureExprSyntax
 
-        try (node as? WithModifiersSyntax)?.modifiers.forEach {
-            guard Constants.accessModifiers.contains($0.name)
-            else { throw ExpansionError("unexpected access modifier `\($0.trimmedDescription)`. Apply access modifiers to the entire extension") }
-        }
-
         switch node.argumentList.last {
         case .none:
             guard let trailingClosure = node.trailingClosure
@@ -103,7 +98,7 @@ public struct KvEnvironmentScopeEntryMacro: DeclarationMacro {
                 } ?? "typealias Value = \(entry.type)"
 
                 return [
-                    "private struct \(keyTypeID) : KvEnvironmentKey { \(keyBody) }",
+                    "struct \(keyTypeID) : KvEnvironmentKey { \(keyBody) }",
                     """
                     var \(entry.identifier): \(entry.type) {
                         get { self[\(keyTypeID).self] }
@@ -116,19 +111,6 @@ public struct KvEnvironmentScopeEntryMacro: DeclarationMacro {
         default:
             throw ExpansionError.unexpectedStatement(variableDecl, "only `let` and `var` binding specifiers are supported")
         }
-    }
-
-    // MARK: .Constants
-
-    private enum Constants {
-        static var accessModifiers: Set<TokenSyntax> { [
-            .keyword(.fileprivate),
-            .keyword(.internal),
-            .keyword(.open),
-            .keyword(.package),
-            .keyword(.private),
-            .keyword(.public),
-        ] }
     }
 
     // MARK: .EntryDescription
