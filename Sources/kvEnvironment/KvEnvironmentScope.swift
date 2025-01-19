@@ -26,10 +26,10 @@
 import Foundation
 
 // TODO: DOC
-public final class KvEnvironmentScope {
+public final class KvEnvironmentScope : NSLocking {
     public static var global: KvEnvironmentScope {
-        get { mutationLock.withLock { _global } }
-        set { mutationLock.withLock { _global = newValue } }
+        get { withLock { _global } }
+        set { withLock { _global = newValue } }
     }
 
     public static var current: KvEnvironmentScope { .taskLocal ?? .global }
@@ -74,13 +74,13 @@ public final class KvEnvironmentScope {
     // MARK: Content
 
     var isEmpty: Bool {
-        mutationLock.withLock {
+        withLock {
             container.isEmpty
         }
     }
 
     func forEach(_ body: (Any) -> Void) {
-        mutationLock.withLock { container }
+        withLock { container }
             .values.forEach(body)
     }
 
@@ -89,13 +89,13 @@ public final class KvEnvironmentScope {
     @inlinable
     public subscript<Key : KvEnvironmentKey>(key: Key.Type) -> Key.Value {
         get { value(forKey: key) ?? key.defaultValue }
-        set { mutationLock.withLock { container[ObjectIdentifier(key)] = newValue } }
+        set { withLock { container[ObjectIdentifier(key)] = newValue } }
     }
 
     @usableFromInline
     internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
-        mutationLock.lock()
-        defer { mutationLock.unlock() }
+        lock()
+        defer { unlock() }
 
         return firstResult { scope in scope.container[ObjectIdentifier(key)] }
             .map { $0 as! Key.Value }
@@ -105,7 +105,7 @@ public final class KvEnvironmentScope {
         }(key.defaultValue)
     }
 
-    /// - Important: `mutationLock` must be locked.
+    /// - Important: The receiver must be locked.
     private func firstResult<T>(of block: (borrowing KvEnvironmentScope) -> T?) -> T? {
         if let value = block(self) {
             return value
@@ -114,7 +114,7 @@ public final class KvEnvironmentScope {
         var container = self
 
         while let next = container.parent {
-            if let value = next.mutationLock.withLock({ block(next) }) {
+            if let value = next.withLock({ block(next) }) {
                 return value
             }
 
@@ -122,6 +122,18 @@ public final class KvEnvironmentScope {
         }
 
         return nil
+    }
+
+    // MARK: + NSLocking
+
+    @inlinable public func lock() { mutationLock.lock() }
+
+    @inlinable public func unlock() { mutationLock.unlock() }
+
+    // MARK: Static Locking
+
+    private static func withLock<R>(_ body: () throws -> R) rethrows -> R {
+        try mutationLock.withLock(body)
     }
 
     // MARK: Operations
