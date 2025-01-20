@@ -39,9 +39,16 @@ public final class KvEnvironmentScope : NSLocking {
 
     private static var _global = KvEnvironmentScope(parent: nil)
 
-    private static let mutationLock = NSLock()
+    // - NOTE: Recursive lock is used to provide consistent public interface and avoid dead locks when `lock()` and `unlock()` are used.
+    private static let mutationLock = NSRecursiveLock()
 
-    public private(set) var parent: KvEnvironmentScope?
+    public var parent: KvEnvironmentScope? {
+        get { withLock { _parent } }
+        set { withLock { _parent = newValue } }
+    }
+
+    @usableFromInline
+    internal var _parent: KvEnvironmentScope?
 
     @usableFromInline
     internal var container: [ObjectIdentifier : Any] = .init()
@@ -111,14 +118,14 @@ public final class KvEnvironmentScope : NSLocking {
             return value
         }
 
-        var container = self
+        var next = _parent
 
-        while let next = container.parent {
-            if let value = next.withLock({ block(next) }) {
+        while let container = next {
+            if let value = container.withLock({ block(container) }) {
                 return value
             }
 
-            container = next
+            next = container.parent
         }
 
         return nil
@@ -126,13 +133,22 @@ public final class KvEnvironmentScope : NSLocking {
 
     // MARK: + NSLocking
 
+    /// - SeeAlso: ``withLock(_:)-swift.method``, ``unlock()-swift.method``.
     @inlinable public func lock() { mutationLock.lock() }
 
+    /// - SeeAlso: ``withLock(_:)-swift.method``, ``lock()-swift.method``.
     @inlinable public func unlock() { mutationLock.unlock() }
 
     // MARK: Static Locking
 
-    private static func withLock<R>(_ body: () throws -> R) rethrows -> R {
+    /// - SeeAlso: ``withLock(_:)-swift.type.method(_:)``, ``unlock()-swift.type.method``.
+    public static func lock() { mutationLock.lock() }
+
+    /// - SeeAlso: ``withLock(_:)-swift.type.method``, ``lock()-swift.type.method``.
+    public static func unlock() { mutationLock.unlock() }
+
+    /// - SeeAlso: ``lock()-swift.type.method``, ``unlock()-swift.type.method``.
+    public static func withLock<R>(_ body: () throws -> R) rethrows -> R {
         try mutationLock.withLock(body)
     }
 
