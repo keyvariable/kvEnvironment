@@ -28,7 +28,7 @@ struct Sample {
                 print(d)
 
                 /// Changing the current scope to `childScopeB`.
-                childScopeB { _ in
+                childScopeB {
                     print(d)
                 }
             }
