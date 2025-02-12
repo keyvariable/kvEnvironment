@@ -1,7 +1,7 @@
 # kvEnvironment
 
 An implementation of dependency injection pattern. *kvEnvironment* provides:
-- simple API;
+- simple API with strong typing;
 - hierarchy of scopes with cascade resolution of properties;
 - thread-safety;
 - flexible ways to override scopes;
