@@ -93,12 +93,27 @@ public final class KvEnvironmentScope : NSLocking {
     /// ``KvEnvironmentKey/defaultValue`` is returned if there is no value for *key*.
     @inlinable
     public subscript<Key : KvEnvironmentKey>(key: Key.Type) -> Key.Value {
-        get { value(forKey: key) ?? key.defaultValue }
+        get { value(forKey: key) }
         set { withLock { container[ObjectIdentifier(key)] = newValue } }
     }
 
+    /// Removes value for given *key* from the receiver.
+    ///
+    /// - Returns: Removed value.
+    ///
+    /// - Note: This method is thread-safe.
+    ///
+    /// - SeeAlso: ``subscript(key:)``.
+    @inlinable
+    public func removeValue<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
+        withLock {
+            container.removeValue(forKey: ObjectIdentifier(key))
+                .map { $0 as! Key.Value }
+        }
+    }
+
     @usableFromInline
-    internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
+    internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value {
         lock()
         defer { unlock() }
 
