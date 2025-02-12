@@ -61,7 +61,7 @@ extension KvEnvironmentScope {
     /// Constant declarations are transformed to computed properties having getters only.
     ///
     /// `#kvEnvironment` is compatible with attributes and modifiers.
-    fileprivate #kvEnvironment { var a_ee: A = .init(a: 0xEE), a_ff: A? = .init(a: 0xFF) }
+    fileprivate #kvEnvironment { let a_ee: A = .init(a: 0xEE), a_ff: A? = .init(a: 0xFF) }
 }
 /// Below is an example of explicit declaration of an environment property.
 private extension KvEnvironmentScope {
