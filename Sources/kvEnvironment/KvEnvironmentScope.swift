@@ -23,13 +23,114 @@
 
 import Foundation
 
-// TODO: DOC
+/// Scopes store environment properties and provide access to them via keys.
+///
+/// Keys are represented as types adopting ``KvEnvironmentKey`` protocol.
+/// Keys provide strong typing and default values.
+/// Default values are lazily evaluated once when a scope contains no value for a key.
+///
+/// Below is an example of an environment property `serviceA` of `ServiceA` type with default initializer:
+/// ```swift
+/// extension KvEnvironmentScope {
+///     #kvEnvironment { var serviceA: ServiceA = .init() }
+/// }
+/// ```
+/// ``kvEnvironment(properties:)`` macro is a simple way to declare environment properties.
+/// With this macro environment properties are declared just like usual properties with type annotations and initial values.
+/// Also environment keys are created automatically.
+/// Below is an example of explicit declaration of key and convenient property:
+/// ```swift
+/// extension KvEnvironmentScope {
+///     private struct ServiceAKey : KvEnvironmentKey {
+///         static var defaultValue: ServiceA { .init() }
+///     }
+///     var serviceA: ServiceA {
+///         get { self[ServiceAKey.self] }
+///         set { self[ServiceAKey.self] = newValue }
+///     }
+/// }
+/// ```
+///
+/// Scopes can be nested to compose complex hierarchies.
+/// See ``parent`` property.
+///
+/// Access to values is provided via ``subscript(key:)`` subscript.
+/// It can be used explicitly or implicitly via convenient ``KvEnvironment`` property wrapper.
+/// See examples:
+/// ```swift
+/// struct B1 {
+///     @KvEnvironment(\.serviceA) private var serviceA
+/// }
+/// struct B2 {
+///     private let serviceA: ServiceA
+///
+///     init(_ scope: KvEnvironmentScope = .current) {
+///         serviceA = scope.serviceA
+///     }
+/// }
+/// struct B3 {
+///     private let serviceA = KvEnvironmentScope.current[ServiceAKey.self]
+/// }
+/// ```
+///
+/// Both instance and static methods of `KvEnvironmentScope` are thread-safe.
+///
+/// ## Global and Current Scopes
+///
+/// `KvEnvironmentScope` provides ``global`` scope.
+/// It always exists and is used when no other scope is provided.
+/// Global scope is mutable so it can be replaced with your own instance.
+/// Also a scope (``global`` among others) can be modified via ``callAsFunction(body:)-90rzi`` syntax:
+/// ```swift
+/// KvEnvironmentScope.global {
+///     $0.serviceA = someInstance
+/// }
+/// ```
+///
+/// `KvEnvironmentScope` also provides ``current`` scope.
+/// It's tail of a task-local (thread-local in synchronous context) scope stack
+/// where head is ``global`` scope and elements are temporary pushed via ``callAsFunction(body:)-4envx`` syntax.
+/// ``KvEnvironment`` property wrapper resolves references in ``current`` scope by default.
+/// For example:
+/// ```swift
+/// struct C {
+///     @KvEnvironment(\.serviceA) private var serviceA
+/// }
+///
+/// let customScope = KvEnvironmentScope {
+///     $0.serviceA = otherInstance
+/// }
+/// let c = C()
+///
+/// // Value of c.serviceA is from global scope here
+/// print(c.serviceA)
+///
+/// customScope {
+///     // Value of c.serviceA is from customScope here
+///     print(c.serviceA)
+/// }
+/// ```
+///
+/// - SeeAlso: ``KvEnvironment``, ``kvEnvironment(properties:)``, ``KvEnvironmentKey``.
 public final class KvEnvironmentScope : NSLocking {
+    /// The global scope.
+    /// It's used as default parent scope and it's default ``current`` scope.
+    ///
+    /// It can be changed. Access to this property is thread-safe.
+    ///
+    /// - SeeAlso: ``current``, ``withLock(_:)-swift.type.method``.
     public static var global: KvEnvironmentScope {
         get { withLock { _global } }
         set { withLock { _global = newValue } }
     }
 
+    /// Current task-local (or thread-local) scope.
+    /// By default it's ``global`` and can be changed with ``callAsFunction(body:)-4envx`` method.
+    ///
+    /// Current scope affects ``KvEnvironment`` property wrapper.
+    /// See documentation of ``KvEnvironment`` for details.
+    ///
+    /// - SeeAlso: ``global``, ``KvEnvironment``.
     public static var current: KvEnvironmentScope { .taskLocal ?? .global }
 
     @TaskLocal
@@ -37,7 +138,8 @@ public final class KvEnvironmentScope : NSLocking {
 
     private static var _global = KvEnvironmentScope(parent: nil)
 
-    // - NOTE: Recursive lock is used to provide consistent public interface and avoid dead locks when `lock()` and `unlock()` are used.
+    // - NOTE: Recursive lock is used to provide consistent public interface
+    //     and avoid dead locks when static `lock()` and `unlock()` are used.
     private static let mutationLock = NSRecursiveLock()
 
     public var parent: KvEnvironmentScope? {
@@ -56,13 +158,16 @@ public final class KvEnvironmentScope : NSLocking {
 
     // MARK: Initialization
 
-    // TODO: DOC
     @usableFromInline
     internal init(parent: KvEnvironmentScope? = .global) {
         self.parent = parent
     }
 
-    // TODO: DOC
+    /// Initializes a scope and takes a trailing block to provide custom initialization.
+    ///
+    /// - Parameter parent: Parent scope that new instance inherits. Default is ``global``. Pass `nil` to create a root scope.
+    /// - Parameter contentBlock: Custom block that is passed with new empty scope just before initializer returns.
+    ///
     /// - SeeAlso: ``empty(parent:)``.
     public convenience init(parent: KvEnvironmentScope? = .global, contentBlock: (borrowing KvEnvironmentScope) -> Void) {
         self.init(parent: parent)
@@ -70,7 +175,13 @@ public final class KvEnvironmentScope : NSLocking {
         self.callAsFunction(body: contentBlock)
     }
 
-    // TODO: DOC
+    /// Creates an empty scope.
+    ///
+    /// - Parameter parent: Parent scope that new instance inherits. Default is ``global``. Pass `nil` to create a root scope.
+    ///
+    /// - Returns: Created empty scope.
+    ///
+    /// - SeeAlso: ``init(parent:contentBlock:)``.
     @inlinable
     public static func empty(parent: KvEnvironmentScope? = .global) -> KvEnvironmentScope {
         .init(parent: parent)
@@ -90,7 +201,16 @@ public final class KvEnvironmentScope : NSLocking {
     }
 
     /// Getter returns the closest value in the hierarchy by given *key*.
-    /// ``KvEnvironmentKey/defaultValue`` is returned if there is no value for *key*.
+    /// If there is no value in the receiver and it's ancestors then ``KvEnvironmentKey/defaultValue`` is instantiated, saved in the receiver and returned.
+    ///
+    /// Setter saves given value in the receiver.
+    ///
+    /// - Note: This subscript is thread-safe.
+    ///
+    /// - Note: Unlike standard `Dictionary` this subscript is unable to remove values.
+    ///     Use ``removeValue(forKey:)`` instead.
+    ///
+    /// - SeeAlso: ``removeValue(forKey:)``.
     @inlinable
     public subscript<Key : KvEnvironmentKey>(key: Key.Type) -> Key.Value {
         get { value(forKey: key) }
@@ -146,20 +266,48 @@ public final class KvEnvironmentScope : NSLocking {
 
     // MARK: + NSLocking
 
+    /// Acquires exclusive access to the receiver.
+    /// Access from any other thread will will be paused until ``unlock()-swift.method`` is invoked from the same thread.
+    ///
+    /// - Important: ``unlock()-swift.method`` must be called to release exclusive access.
+    ///     Consider ``withLock(_:)-swift.method`` method whenever possible instead of ``lock()-swift.method`` and ``unlock()-swift.method``
+    ///     to guarantee release of exclusive access.
+    ///
     /// - SeeAlso: ``withLock(_:)-swift.method``, ``unlock()-swift.method``.
     @inlinable public func lock() { mutationLock.lock() }
 
+    /// Releases exclusive access acquired by ``lock()-swift.method`` method.
+    ///
+    /// - Important: Consider ``withLock(_:)-swift.method`` method whenever possible instead of ``lock()-swift.method`` and ``unlock()-swift.method``
+    ///     to guarantee release of exclusive access.
+    ///
     /// - SeeAlso: ``withLock(_:)-swift.method``, ``lock()-swift.method``.
     @inlinable public func unlock() { mutationLock.unlock() }
 
     // MARK: Static Locking
 
+    /// Acquires exclusive access to static mutable state of ``KvEnvironmentScope``, e.g. ``global`` property.
+    /// Access from any other thread will will be paused until ``unlock()-swift.type.method`` is invoked from the same thread.
+    ///
+    /// - Important: ``unlock()-swift.type.method`` must be called to release exclusive access.
+    ///     Consider ``withLock(_:)-swift.type.method`` method whenever possible
+    ///     instead of ``lock()-swift.type.method`` and ``unlock()-swift.type.method`` to guarantee release of exclusive access.
+    ///
     /// - SeeAlso: ``withLock(_:)-swift.type.method(_:)``, ``unlock()-swift.type.method``.
     public static func lock() { mutationLock.lock() }
 
+    /// Releases exclusive access acquired by ``lock()-swift.type.method`` method.
+    ///
+    /// - Important: Consider ``withLock(_:)-swift.type.method`` method whenever possible
+    ///     instead of ``lock()-swift.type.method`` and ``unlock()-swift.type.method`` to guarantee release of exclusive access.
+    ///
     /// - SeeAlso: ``withLock(_:)-swift.type.method``, ``lock()-swift.type.method``.
     public static func unlock() { mutationLock.unlock() }
 
+    /// A convenient method that invokes ``lock()-swift.type.method``, then given *body* block and then invokes ``unlock()-swift.type.method`` anyway.
+    ///
+    /// - Returns: The result of *body* block.
+    ///
     /// - SeeAlso: ``lock()-swift.type.method``, ``unlock()-swift.type.method``.
     public static func withLock<R>(_ body: () throws -> R) rethrows -> R {
         try mutationLock.withLock(body)
@@ -167,13 +315,51 @@ public final class KvEnvironmentScope : NSLocking {
 
     // MARK: Operations
 
-    // TODO: DOC
+    /// Scope supports call-as-function semantics to temporary override ``current`` task-local (or thread-local) scope
+    /// while given *body* block is running.
+    ///
+    /// ``KvEnvironment`` property wrapper resolves the references in ``current`` scope by default
+    /// so call-as-function semantics helps to override scope with no need to modify existing instances of types with dependencies.
+    /// For example:
+    /// ```swift
+    /// struct C {
+    ///     @KvEnvironment(\.serviceA) private var serviceA
+    /// }
+    ///
+    /// let c = C()
+    /// 
+    /// // Here `c.serviceA` is resolved in `global` scope
+    /// print(c.serviceA)
+    ///
+    /// // Replacing `current` scope with call-as-function semantics
+    /// someScope {
+    ///     // Here `c.serviceA` is resolved in `someScope`
+    ///     print(c.serviceA)
+    /// }
+    /// ```
+    ///
+    /// - Note: There are all sync/async throwing/non-throwing overloads of this method.
+    ///
+    /// - SeeAlso: ``current``, ``callAsFunction(body:)-90rzi``.
     @KvEnvironmentScopeAsyncThrowsOverloads
     public func callAsFunction(body: () -> Void) {
         KvEnvironmentScope.$taskLocal.withValue(self, operation: body)
     }
 
-    // TODO: DOC
+    /// Analog of ``callAsFunction(body:)-4envx`` there *body* is passed with the receiver.
+    /// It's convenient to apply batch modifications to scopes using call-as-function semantics.
+    /// Below is an example where ``global`` is modified:
+    /// ```swift
+    /// KvEnvironmentScope.global {
+    ///     $0.serviceA = someValueA
+    ///     $0.serviceB = someValueB
+    ///     $0.serviceC = someValueC
+    /// }
+    /// ```
+    ///
+    /// - Note: There are all sync/async throwing/non-throwing overloads of this method.
+    ///
+    /// - SeeAlso: ``callAsFunction(body:)-4envx``.
     @KvEnvironmentScopeAsyncThrowsOverloads
     public func callAsFunction(body: (borrowing KvEnvironmentScope) -> Void) {
         KvEnvironmentScope.$taskLocal.withValue(self) {
@@ -181,7 +367,13 @@ public final class KvEnvironmentScope : NSLocking {
         }
     }
 
-    // TODO: DOC
+    /// This method changes ``KvEnvironment/scope`` to the receiver
+    /// for properties of *instance* having ``KvEnvironment`` attribute.
+    ///
+    /// If ``ReplaceOptions/recursive`` is passed then this method is recursively called for values of affected properties.
+    /// Cycles in the dependency graph are properly handled.
+    ///
+    /// - SeeAlso: ``replace(in:options:)-7g4rs``, ``replace(in:_:_:options:)``.
     @inlinable
     public func replace(in instance: Any, options: ReplaceOptions = []) {
         switch options.contains(.recursive) {
@@ -195,7 +387,9 @@ public final class KvEnvironmentScope : NSLocking {
         }
     }
 
-    // TODO: DOC
+    /// This overload of ``replace(in:options:)-4j9gb`` affects all instances in given sequence.
+    ///
+    /// - SeeAlso: ``replace(in:options:)-4j9gb``, ``replace(in:_:_:options:)``.
     @inlinable
     public func replace<I>(in instances: I, options: ReplaceOptions = []) where I: Sequence {
         var visitedIDs = Set<ObjectIdentifier>()
@@ -205,7 +399,9 @@ public final class KvEnvironmentScope : NSLocking {
         }
     }
 
-    // TODO: DOC
+    /// This overload of ``replace(in:options:)-4j9gb`` affects all given instances.
+    ///
+    /// - SeeAlso: ``replace(in:options:)-4j9gb``, ``replace(in:options:)-7g4rs``.
     @inlinable
     public func replace(in first: Any, _ second: Any, _ rest: Any..., options: ReplaceOptions = []) {
         var visitedIDs = Set<ObjectIdentifier>()
@@ -276,7 +472,28 @@ public final class KvEnvironmentScope : NSLocking {
 
 // MARK: - macro kvEnvironmentScope
 
-// TODO: DOC
+/// This macro is a simple way to declare environment properties.
+/// With this macro environment properties are declared just like usual properties with type annotations and initial values.
+/// Also environment keys are created automatically.
+///
+/// ```swift
+/// extension KvEnvironmentScope {
+///     #kvEnvironment {
+///         var a: A?
+///         var b1: B = .first, b2: B = .second
+///         let b3: B = .third
+///     }
+///     fileprivate #kvEnvironment { var c: C }
+/// }
+/// ```
+///
+/// This macro is compatible with attributes and modifiers.
+/// Constant declarations are transformed to computed properties having getters only.
+///
+/// Implicit initial value of optional types is `nil`.
+/// Opaque types without initial value are permitted but they must be initialized before first use.
+///
+/// - SeeAlso: ``KvEnvironmentScope``.
 @freestanding(declaration, names: arbitrary)
 public macro kvEnvironment(properties: () -> Void) = #externalMacro(module: "kvEnvironmentMacros", type: "KvEnvironmentScopeEntryMacro")
 

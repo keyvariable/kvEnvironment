@@ -21,7 +21,13 @@
 //  Created by Svyatoslav Popov on 22.11.2023.
 //
 
-// TODO: DOC
+/// Types adopting `KvEnvironmentKey` protocol identify environment properties in scopes (``KvEnvironmentScope``).
+/// An environment key defines the value type and optionally provides default value.
+///
+/// Usually there is no need to define keys manually.
+/// ``kvEnvironment(properties:)`` macro defines both keys and convenient properties in scopes.
+///
+/// - SeeAlso: ``kvEnvironment(properties:)``, ``KvEnvironmentScope/subscript(key:)``.
 public protocol KvEnvironmentKey {
     associatedtype Value
 

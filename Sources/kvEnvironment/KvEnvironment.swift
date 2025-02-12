@@ -32,8 +32,41 @@ protocol KvEnvironmentProtocol : AnyObject {
 
 // MARK: - KvEnvironment
 
+/// This property wrapper helps to create references to properties in environment scopes (``KvEnvironmentScope``).
+/// Let `serviceA` of type `ServiceA` is an environment property.
+/// Then a dependency in another service `ServiceB` may be declared this way:
+/// ```swift
+/// struct ServiceB {
+///     @KvEnvironment(\.serviceA) private var serviceA
+/// }
+/// ```
+///
+/// Type of `serviceA` is inferred.
+///
+/// `KvEnvironment` doesn't store a direct reference to an instance.
+/// It stores a key path and resolves it in ``KvEnvironmentScope/current`` task-local scope each time.
+/// So retain cycles don't occur in cyclic dependencies.
+/// Scope can be specified explicitly when `KvEnvironment` initialized or via ``scope`` property of projected value (`$serviceA.scope`) at run time.
+/// Also ``KvEnvironmentScope/replace(in:options:)-4j9gb`` and it's overloads may be used.
+///
+/// It isn't required to use `KvEnvironment` to access environment properties.
+/// You can access properties via ``KvEnvironmentScope/subscript(key:)`` by it key or via shorthand property if available.
+/// See ``kvEnvironment(properties:)`` macro. This macro creates both the keys and the properties.
+/// It's convenient when you need to save an instance regardless to any further changes in environment.
+/// Below is an example where `serviceA` is saved from global scope when `ServiceC` is initialized:
+/// ```swift
+/// struct ServiceC {
+///     let serviceA = KvEnvironmentScope.global.serviceA
+/// }
+/// ```
+///
+/// - SeeAlso: ``KvEnvironmentScope``.
 @propertyWrapper
 public final class KvEnvironment<Value> : KvEnvironmentProtocol {
+    /// A scope the receiver is resolved in.
+    /// If it's `nil` (default) then the receiver is resolved in ``KvEnvironmentScope/current`` task-local scope.
+    ///
+    /// - Note: This property is not thread-safe.
     public var scope: KvEnvironmentScope?
 
     @usableFromInline
