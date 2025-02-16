@@ -15,19 +15,57 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvEnvironmentMacros.swift
+//  EFG.swift
 //  KvEnvironment
 //
-//  Created by Svyatoslav Popov on 03.01.2025.
+//  Created by Svyatoslav Popov on 16.02.2025.
 //
 
-import SwiftCompilerPlugin
-import SwiftSyntaxMacros
+@testable import kvEnvironment
 
-@main
-struct KvEnvironmentMacros: CompilerPlugin {
-    let providingMacros: [Macro.Type] = [
-        KvEnvironmentScopeAsyncThrowsOverloadsMacro.self,
-        KvEnvironmentScopeEntryMacro.self,
-    ]
+// MARK: - E
+
+/// A structure having cyclic dependency on `f`.
+///
+/// Dependency graph:
+/// ```
+/// E ═ F
+/// ```
+struct E {
+    let id: String
+
+    @KvEnvironment(\.f) var f
+}
+
+extension KvEnvironmentScope { #kvEnvironment { var e: E } }
+
+// MARK: - F
+
+/// A structure having cyclic dependency on `e`.
+///
+/// Dependency graph:
+/// ```
+/// E ═ F
+/// ```
+struct F {
+    let id: String
+
+    @KvEnvironment(\.e) var e
+}
+
+extension KvEnvironmentScope { #kvEnvironment { var f: F } }
+
+// MARK: - G
+
+/// A structure depending on `e` and `f`.
+///
+/// Dependency graph:
+/// ```
+/// E╶─╮
+/// ║  G
+/// F╶─╯
+/// ```
+struct G {
+    @KvEnvironment(\.e) var e
+    @KvEnvironment(\.f) var f
 }
