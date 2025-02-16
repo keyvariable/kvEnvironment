@@ -14,12 +14,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
     ],
     targets: [
-        .executableTarget(
-            name: "Sample",
-            dependencies: [
-                .target(name: "kvEnvironment"),
-            ]
-        ),
         .macro(
             name: "kvEnvironmentMacros",
             dependencies: [
@@ -28,5 +22,9 @@ let package = Package(
             ]
         ),
         .target(name: "kvEnvironment", dependencies: [ "kvEnvironmentMacros" ]),
+        .testTarget(
+            name: "kvEnvironmentTests",
+            dependencies: ["kvEnvironment"]
+        ),
     ]
 )

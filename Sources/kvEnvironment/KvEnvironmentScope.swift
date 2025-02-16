@@ -158,8 +158,12 @@ public final class KvEnvironmentScope : NSLocking {
 
     // MARK: Initialization
 
+    /// - Parameter parent: It's designated to be `global` by default and `nil` for stand-alone scopes.
+    ///
+    /// - Note: There is no default value for `parent` to avoid ambiguity in code like `KvEnvironmentScope { ... }`
+    ///     that can be equal to `let s = KvEnvironmentScope(); s { ... }`.
     @usableFromInline
-    internal init(parent: KvEnvironmentScope? = .global) {
+    internal init(parent: KvEnvironmentScope?) {
         self.parent = parent
     }
 
