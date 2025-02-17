@@ -27,7 +27,7 @@
 /// Usually there is no need to define keys manually.
 /// ``kvEnvironment(properties:)`` macro defines both keys and convenient properties in scopes.
 ///
-/// - SeeAlso: ``kvEnvironment(properties:)``, ``KvEnvironmentScope/subscript(key:)``.
+/// - SeeAlso: ``kvEnvironment(properties:)``, ``KvEnvironmentScope/subscript(_:)``.
 public protocol KvEnvironmentKey {
     associatedtype Value
 

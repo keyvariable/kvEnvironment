@@ -50,7 +50,7 @@ protocol KvEnvironmentProtocol : AnyObject {
 /// Also ``KvEnvironmentScope/replace(in:options:)-4j9gb`` and it's overloads may be used.
 ///
 /// It isn't required to use `KvEnvironment` to access environment properties.
-/// You can access properties via ``KvEnvironmentScope/subscript(key:)`` by it key or via shorthand property if available.
+/// You can access properties via ``KvEnvironmentScope/subscript(_:)`` by it key or via shorthand property if available.
 /// See ``kvEnvironment(properties:)`` macro. This macro creates both the keys and the properties.
 /// It's convenient when you need to save an instance regardless to any further changes in environment.
 /// Below is an example where `serviceA` is saved from global scope when `ServiceC` is initialized:

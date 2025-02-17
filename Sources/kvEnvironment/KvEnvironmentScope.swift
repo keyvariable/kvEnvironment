@@ -54,7 +54,7 @@ import Foundation
 /// Scopes can be nested to compose complex hierarchies.
 /// See ``parent`` property.
 ///
-/// Access to values is provided via ``subscript(key:)`` subscript.
+/// Access to values is provided via ``subscript(_:)`` subscript.
 /// It can be used explicitly or implicitly via convenient ``KvEnvironment`` property wrapper.
 /// See examples:
 /// ```swift
@@ -227,7 +227,7 @@ public final class KvEnvironmentScope : NSLocking {
     ///
     /// - Note: This method is thread-safe.
     ///
-    /// - SeeAlso: ``subscript(key:)``.
+    /// - SeeAlso: ``subscript(_:)``.
     @inlinable
     public func removeValue<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
         withLock {
@@ -297,7 +297,7 @@ public final class KvEnvironmentScope : NSLocking {
     ///     Consider ``withLock(_:)-swift.type.method`` method whenever possible
     ///     instead of ``lock()-swift.type.method`` and ``unlock()-swift.type.method`` to guarantee release of exclusive access.
     ///
-    /// - SeeAlso: ``withLock(_:)-swift.type.method(_:)``, ``unlock()-swift.type.method``.
+    /// - SeeAlso: ``withLock(_:)-swift.type.method``, ``unlock()-swift.type.method``.
     public static func lock() { mutationLock.lock() }
 
     /// Releases exclusive access acquired by ``lock()-swift.type.method`` method.
