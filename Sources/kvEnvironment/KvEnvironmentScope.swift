@@ -112,7 +112,7 @@ import Foundation
 /// ```
 ///
 /// - SeeAlso: ``KvEnvironment``, ``kvEnvironment(properties:)``, ``KvEnvironmentKey``.
-public final class KvEnvironmentScope : NSLocking {
+public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     /// The global scope.
     /// It's used as default parent scope and it's default ``current`` scope.
     ///
@@ -136,7 +136,11 @@ public final class KvEnvironmentScope : NSLocking {
     @TaskLocal
     static var taskLocal: KvEnvironmentScope?
 
+#if swift(>=6.0)
+    nonisolated(unsafe) private static var _global = KvEnvironmentScope(parent: nil)
+#else // swift(<6.0)
     private static var _global = KvEnvironmentScope(parent: nil)
+#endif // swift(<6.0)
 
     // - NOTE: Recursive lock is used to provide consistent public interface
     //     and avoid dead locks when static `lock()` and `unlock()` are used.
