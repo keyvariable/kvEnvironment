@@ -112,7 +112,7 @@ import Foundation
 /// ```
 ///
 /// - SeeAlso: ``KvEnvironment``, ``kvEnvironment(properties:)``, ``KvEnvironmentKey``.
-public final class KvEnvironmentScope : NSLocking {
+public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     /// The global scope.
     /// It's used as default parent scope and it's default ``current`` scope.
     ///
@@ -133,10 +133,17 @@ public final class KvEnvironmentScope : NSLocking {
     /// - SeeAlso: ``global``, ``KvEnvironment``.
     public static var current: KvEnvironmentScope { .taskLocal ?? .global }
 
+    @usableFromInline
+    static var _current: KvEnvironmentScope { .taskLocal ?? ._global }
+
     @TaskLocal
     static var taskLocal: KvEnvironmentScope?
 
-    private static var _global = KvEnvironmentScope(parent: nil)
+#if swift(>=6.0)
+    nonisolated(unsafe) static var _global = KvEnvironmentScope(parent: nil)
+#else // swift(<6.0)
+    static var _global = KvEnvironmentScope(parent: nil)
+#endif // swift(<6.0)
 
     // - NOTE: Recursive lock is used to provide consistent public interface
     //     and avoid dead locks when static `lock()` and `unlock()` are used.
@@ -148,13 +155,13 @@ public final class KvEnvironmentScope : NSLocking {
     }
 
     @usableFromInline
-    internal var _parent: KvEnvironmentScope?
+    var _parent: KvEnvironmentScope?
 
     @usableFromInline
-    internal var container: [ObjectIdentifier : Any] = .init()
+    var container: [ObjectIdentifier : Any] = .init()
 
     @usableFromInline
-    internal let mutationLock = NSLock()
+    let mutationLock = NSLock()
 
     // MARK: Initialization
 
