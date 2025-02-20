@@ -133,13 +133,16 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     /// - SeeAlso: ``global``, ``KvEnvironment``.
     public static var current: KvEnvironmentScope { .taskLocal ?? .global }
 
+    @usableFromInline
+    static var _current: KvEnvironmentScope { .taskLocal ?? ._global }
+
     @TaskLocal
     static var taskLocal: KvEnvironmentScope?
 
 #if swift(>=6.0)
-    nonisolated(unsafe) private static var _global = KvEnvironmentScope(parent: nil)
+    nonisolated(unsafe) static var _global = KvEnvironmentScope(parent: nil)
 #else // swift(<6.0)
-    private static var _global = KvEnvironmentScope(parent: nil)
+    static var _global = KvEnvironmentScope(parent: nil)
 #endif // swift(<6.0)
 
     // - NOTE: Recursive lock is used to provide consistent public interface
@@ -152,13 +155,13 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     }
 
     @usableFromInline
-    internal var _parent: KvEnvironmentScope?
+    var _parent: KvEnvironmentScope?
 
     @usableFromInline
-    internal var container: [ObjectIdentifier : Any] = .init()
+    var container: [ObjectIdentifier : Any] = .init()
 
     @usableFromInline
-    internal let mutationLock = NSLock()
+    let mutationLock = NSLock()
 
     // MARK: Initialization
 

@@ -93,7 +93,9 @@ extension KvEnvironmentScope {
 ///    C╶╴D
 /// B╶─╯
 /// ```
-struct D {
+///
+/// - Note: It's `Sendable` to provide compile-time test for conformance of `KvEnvironment` to `Sendable` protocol.
+struct D: Sendable {
     @KvEnvironment(\.c) var c
 
     init() { }

@@ -50,9 +50,9 @@ protocol KvEnvironmentProtocol : AnyObject {
 /// Also ``KvEnvironmentScope/replace(in:options:)-4j9gb`` and it's overloads may be used.
 ///
 /// It isn't required to use `KvEnvironment` to access environment properties.
-/// You can access properties via ``KvEnvironmentScope/subscript(_:)`` by it key or via shorthand property if available.
+/// You can access properties via ``KvEnvironmentScope/subscript(_:)`` by the key or via shorthand property if available.
 /// See ``kvEnvironment(properties:)`` macro. This macro creates both the keys and the properties.
-/// It's convenient when you need to save an instance regardless to any further changes in environment.
+/// E.g. it's convenient when you need to save a direct reference to an instance regardless to any further changes in environment.
 /// Below is an example where `serviceA` is saved from global scope when `ServiceC` is initialized:
 /// ```swift
 /// struct ServiceC {
@@ -60,14 +60,26 @@ protocol KvEnvironmentProtocol : AnyObject {
 /// }
 /// ```
 ///
+/// ## Thread-safety and Performance
+///
+/// `KvEnvironment` is thread-safe.
+/// Instances of `KvEnvironment` share a mutex so only one reference can be resolved at a moment.
+/// It can slow down performance when the references are resolved concurrently from several threads/tasks.
+/// Consider direct references instead of `KvEnvironment` wrapper.
+/// See `ServiceC` in example above.
+///
 /// - SeeAlso: ``KvEnvironmentScope``.
 @propertyWrapper
-public final class KvEnvironment<Value> : KvEnvironmentProtocol {
+public final class KvEnvironment<Value> : KvEnvironmentProtocol, @unchecked Sendable {
     /// A scope the receiver is resolved in.
     /// If it's `nil` (default) then the receiver is resolved in ``KvEnvironmentScope/current`` task-local scope.
-    ///
-    /// - Note: This property is not thread-safe.
-    public var scope: KvEnvironmentScope?
+    public var scope: KvEnvironmentScope? {
+        get { KvEnvironmentScope.withLock { _scope } }
+        set { KvEnvironmentScope.withLock { _scope = newValue } }
+    }
+
+    @usableFromInline
+    var _scope: KvEnvironmentScope?
 
     @usableFromInline
     internal let keyPath: KeyPath<KvEnvironmentScope, Value>
@@ -87,7 +99,10 @@ public final class KvEnvironment<Value> : KvEnvironmentProtocol {
     // MARK: + @propertyWrapper
 
     @inlinable
-    public var wrappedValue: Value { (scope ?? .current)[keyPath: keyPath] }
+    public var wrappedValue: Value {
+        let resolvedScope = KvEnvironmentScope.withLock { _scope ?? ._current }
+        return resolvedScope[keyPath: keyPath]
+    }
 
     @inlinable
     public var projectedValue: KvEnvironment { self }
