@@ -295,6 +295,20 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     /// - SeeAlso: ``withLock(_:)-swift.method``, ``lock()-swift.method``.
     @inlinable public func unlock() { mutationLock.unlock() }
 
+#if swift(<6.0) && !canImport(Darwin)
+    /// A convenient method that invokes ``lock()-swift.method``, then given *body* block and then invokes ``unlock()-swift.method`` anyway.
+    ///
+    /// - Returns: The result of *body* block.
+    ///
+    /// - SeeAlso: ``lock()-swift.method``, ``unlock()-swift.method``.
+    @inlinable public func withLock<R>(_ body: () throws -> R) rethrows -> R {
+        lock()
+        defer { unlock() }
+
+        return try body()
+    }
+#endif // swift(<6.0) && !canImport(Darwin)
+
     // MARK: Static Locking
 
     /// Acquires exclusive access to static mutable state of ``KvEnvironmentScope``, e.g. ``global`` property.
@@ -321,7 +335,14 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     ///
     /// - SeeAlso: ``lock()-swift.type.method``, ``unlock()-swift.type.method``.
     public static func withLock<R>(_ body: () throws -> R) rethrows -> R {
+#if swift(>=6.0) || canImport(Darwin)
         try mutationLock.withLock(body)
+#else // swift(<6.0) && !canImport(Darwin)
+        lock()
+        defer { unlock() }
+
+        return try body()
+#endif // swift(<6.0) && !canImport(Darwin)
     }
 
     // MARK: Operations
