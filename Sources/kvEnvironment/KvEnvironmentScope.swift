@@ -112,7 +112,7 @@ import Foundation
 /// ```
 ///
 /// - SeeAlso: ``KvEnvironment``, ``kvEnvironment(properties:)``, ``KvEnvironmentKey``.
-public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
+public final class KvEnvironmentScope : @unchecked Sendable {
     /// The global scope.
     /// It's used as default parent scope and it's default ``current`` scope.
     ///
@@ -150,18 +150,19 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     private static let mutationLock = NSRecursiveLock()
 
     public var parent: KvEnvironmentScope? {
-        get { withLock { _parent } }
-        set { withLock { _parent = newValue } }
+        get { mutationCondition.withLock { _parent } }
+        set { mutationCondition.withLock { _parent = newValue } }
     }
 
     @usableFromInline
     var _parent: KvEnvironmentScope?
 
+    /// - Note: Can contain instances of `PendingValue`.
     @usableFromInline
     var container: [ObjectIdentifier : Any] = .init()
 
     @usableFromInline
-    let mutationLock = NSLock()
+    let mutationCondition = NSCondition()
 
     // MARK: Initialization
 
@@ -201,33 +202,36 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     // MARK: Content
 
     var isEmpty: Bool {
-        withLock {
+        mutationCondition.withLock {
             container.isEmpty
         }
     }
 
     func forEach(_ body: (Any) -> Void) {
-        withLock { container }
+        mutationCondition.withLock { container }
             .values.forEach(body)
     }
 
     /// Getter returns the closest value in the hierarchy by given *key*.
-    /// If there is no value in the receiver and it's ancestors then ``KvEnvironmentKey/defaultValue`` is instantiated, saved in the receiver and returned.
+    /// If there is no value in the receiver and it's ancestors then the default value is evaluated, saved in the receiver and returned.
     ///
     /// Setter saves given value in the receiver.
     ///
     /// - Note: This subscript is thread-safe.
-    ///
-    /// - Note: Unlike standard `Dictionary` this subscript is unable to remove values.
-    ///     Use ``removeValue(forKey:)`` instead.
-    ///
-    /// - SeeAlso: ``removeValue(forKey:)``.
-    @inlinable
-    public subscript<Key : KvEnvironmentKey>(key: Key.Type) -> Key.Value {
-        get { value(forKey: key) }
-        set { withLock { container[ObjectIdentifier(key)] = newValue } }
+    public subscript<Key : KvEnvironmentKeyProtocol>(key: Key.Type) -> Key.Value {
+        get {
+            firstResult(forKey: key)
+            ?? loadValue(forKey: key, default: key.defaultProvider)
+        }
+        set {
+            let key = ObjectIdentifier(key)
+            wait(forKey: key) { _ in
+                container[key] = newValue
+            }
+        }
     }
 
+    // TODO: Remove in 0.8.0
     /// Removes value for given *key* from the receiver.
     ///
     /// - Returns: Removed value.
@@ -235,79 +239,144 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
     /// - Note: This method is thread-safe.
     ///
     /// - SeeAlso: ``subscript(_:)``.
-    @inlinable
+    @available(*, unavailable, message: "Values can't be removed. Remove scopes instead of values")
     public func removeValue<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value? {
-        withLock {
-            container.removeValue(forKey: ObjectIdentifier(key))
-                .map { $0 as! Key.Value }
+        return nil
+    }
+
+    /// - Returns: The closest value in the hierarchy by given *key*.
+    ///     If there is no value in the receiver and it's ancestors then the default value is instantiated, saved in the receiver and returned.
+    ///
+    /// This method is thread-safe and uses Swift async API to wait until default values are initialized instead of locking the thread.
+    ///
+    /// - SeeAlso: ``KvEnvironmentKey``, ``KvAsyncEnvironmentKey``.
+    public func value<Key : KvEnvironmentKeyProtocol>(forKey key: Key.Type) async -> Key.Value {
+        switch await firstResult(forKey: key) as Key.Value? {
+        case .some(let value):
+            value
+        case .none:
+            await loadValue(forKey: key, default: key.defaultProvider)
         }
     }
 
-    @usableFromInline
-    internal func value<Key : KvEnvironmentKey>(forKey key: Key.Type) -> Key.Value {
-        lock()
-        defer { unlock() }
+    private func firstResult<T>(forKey key: Any.Type) -> T? {
+        var next = Optional(self)
 
-        return firstResult { scope in scope.container[ObjectIdentifier(key)] }
-            .map { $0 as! Key.Value }
-        ?? { value in
-            container[ObjectIdentifier(key)] = value
-            return value
-        }(key.defaultValue)
-    }
+        while let scope = next {
+            scope.mutationCondition.lock()
+            defer { scope.mutationCondition.unlock() }
 
-    /// - Important: The receiver must be locked.
-    private func firstResult<T>(of block: (borrowing KvEnvironmentScope) -> T?) -> T? {
-        if let value = block(self) {
-            return value
-        }
-
-        var next = _parent
-
-        while let container = next {
-            if let value = container.withLock({ block(container) }) {
+            if let value: T = scope.loadValue(forKey: key) {
                 return value
             }
 
-            next = container.parent
+            next = scope._parent
         }
 
         return nil
     }
 
-    // MARK: + NSLocking
+    private func firstResult<T>(forKey key: Any.Type) async -> T? {
+        var next = Optional(self)
 
-    /// Acquires exclusive access to the receiver.
-    /// Access from any other thread will will be paused until ``unlock()-swift.method`` is invoked from the same thread.
-    ///
-    /// - Important: ``unlock()-swift.method`` must be called to release exclusive access.
-    ///     Consider ``withLock(_:)-swift.method`` method whenever possible instead of ``lock()-swift.method`` and ``unlock()-swift.method``
-    ///     to guarantee release of exclusive access.
-    ///
-    /// - SeeAlso: ``withLock(_:)-swift.method``, ``unlock()-swift.method``.
-    @inlinable public func lock() { mutationLock.lock() }
+        while let scope = next {
+            let value = scope.mutationCondition.withLock { scope.container[ObjectIdentifier(key)] }
 
-    /// Releases exclusive access acquired by ``lock()-swift.method`` method.
-    ///
-    /// - Important: Consider ``withLock(_:)-swift.method`` method whenever possible instead of ``lock()-swift.method`` and ``unlock()-swift.method``
-    ///     to guarantee release of exclusive access.
-    ///
-    /// - SeeAlso: ``withLock(_:)-swift.method``, ``lock()-swift.method``.
-    @inlinable public func unlock() { mutationLock.unlock() }
+            switch value {
+            case let pendingValue as PendingValue:
+                return Optional(await pendingValue.task.value as! T)
+            case .some(let value):
+                return Optional(value as! T)
+            case .none:
+                next = scope._parent
+            }
+        }
 
-#if swift(<6.0) && !canImport(Darwin)
-    /// A convenient method that invokes ``lock()-swift.method``, then given *body* block and then invokes ``unlock()-swift.method`` anyway.
-    ///
-    /// - Returns: The result of *body* block.
-    ///
-    /// - SeeAlso: ``lock()-swift.method``, ``unlock()-swift.method``.
-    @inlinable public func withLock<R>(_ body: () throws -> R) rethrows -> R {
-        lock()
-        defer { unlock() }
-
-        return try body()
+        return nil
     }
-#endif // swift(<6.0) && !canImport(Darwin)
+
+    /// - Important: The receiver must be locked.
+    private func wait<T>(forKey key: ObjectIdentifier, completion: (Any?) -> T) -> T {
+        while true {
+            let value = container[key]
+
+            guard !(value is PendingValue) else {
+                mutationCondition.wait()
+                continue
+            }
+
+            return completion(value)
+        }
+    }
+
+    private func loadValue<T>(forKey key: Any.Type) -> T? {
+        wait(forKey: ObjectIdentifier(key)) {
+            $0.map { $0 as! T }
+        }
+    }
+
+    private func loadValue<T>(forKey key: Any.Type, default defaultProvider: @escaping () async -> Any) -> T {
+        mutationCondition.withLock {
+            let key = ObjectIdentifier(key)
+
+            return wait(forKey: key) { existingValue in
+                switch existingValue {
+                case .some(let value):
+                    return value as! T
+                case .none:
+                    break
+                }
+
+                container[key] = PendingValue(task: Task.detached {
+                    let value = await defaultProvider()
+
+                    self.mutationCondition.withLock {
+                        self.container[key] = value
+                        self.mutationCondition.broadcast()
+                    }
+
+                    return value
+                })
+
+                return wait(forKey: key) {
+                    $0 as! T
+                }
+            }
+        }
+    }
+
+    private func loadValue<T>(forKey key: Any.Type, default defaultProvider: @escaping @Sendable () async -> Any) async -> T {
+        let key = ObjectIdentifier(key)
+        
+        let result: AsyncLoadIterationResult = mutationCondition.withLock {
+            return {
+                switch $0 {
+                case let pendingValue as PendingValue:
+                    return .deferred(pendingValue.task)
+
+                case .some(let value):
+                    return .value(value)
+
+                case .none:
+                    let task = Task.detached {
+                        let value = await defaultProvider()
+
+                        self.mutationCondition.withLock {
+                            assert(self.container[key] is PendingValue,
+                                   "Internal inconsistency: unexpected value when evaluation of initial value has finished")
+                            self.container[key] = value
+                        }
+
+                        return value
+                    }
+                    $0 = PendingValue(task: task)
+                    return .deferred(task)
+                }
+            }(&container[key])
+        }
+
+        return await result.value as! T
+    }
 
     // MARK: Static Locking
 
@@ -499,6 +568,29 @@ public final class KvEnvironmentScope : NSLocking, @unchecked Sendable {
         // MARK: + ExpressibleByIntegerLiteral
 
         @inlinable public init(integerLiteral value: IntegerLiteralType) { self.init(rawValue: numericCast(value)) }
+    }
+
+    // MARK: .PendingValue
+
+    /// A placeholder idicating that a value is being evaluated.
+    private struct PendingValue {
+        let task: Task<Any, Never>
+    }
+
+    // MARK: .ValueOrTask
+
+    private enum AsyncLoadIterationResult {
+        case deferred(Task<Any, Never>)
+        case value(Any)
+
+        var value: Any { get async {
+            switch self {
+            case .deferred(let task):
+                await task.value
+            case .value(let value):
+                value
+            }
+        } }
     }
 }
 

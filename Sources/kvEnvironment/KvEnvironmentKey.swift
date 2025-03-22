@@ -27,8 +27,10 @@
 /// Usually there is no need to define keys manually.
 /// ``kvEnvironment(properties:)`` macro defines both keys and convenient properties in scopes.
 ///
-/// - SeeAlso: ``kvEnvironment(properties:)``, ``KvEnvironmentScope/subscript(_:)``.
-public protocol KvEnvironmentKey {
+/// Consider ``KvAsyncEnvironmentKey`` to provide async default value getters.
+///
+/// - SeeAlso: ``kvEnvironment(properties:)``, ``KvEnvironmentScope/subscript(_:)``, ``KvAsyncEnvironmentKey``.
+public protocol KvEnvironmentKey : KvEnvironmentKeyProtocol {
     associatedtype Value
 
     static var defaultValue: Self.Value { get }
@@ -36,4 +38,6 @@ public protocol KvEnvironmentKey {
 
 public extension KvEnvironmentKey {
     static var defaultValue: Self.Value { fatalError("No value in the environment for `\(Self.self)` key") }
+
+    static func defaultProvider() async -> Self.Value { defaultValue }
 }

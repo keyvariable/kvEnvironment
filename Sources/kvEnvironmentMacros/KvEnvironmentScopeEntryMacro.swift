@@ -96,7 +96,7 @@ public struct KvEnvironmentScopeEntryMacro: DeclarationMacro {
                 } ?? "typealias Value = \(entry.type)"
 
                 return [
-                    "struct \(keyTypeID) : KvEnvironmentKey { \(keyBody) }",
+                    "struct \(keyTypeID) : KvAsyncEnvironmentKey { \(keyBody) }",
                     """
                     var \(entry.identifier): \(entry.type) {
                         get { self[\(keyTypeID).self] }
